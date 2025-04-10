@@ -374,15 +374,79 @@ const App = () => {
     logDebug("\n=== Final Hours Summary ===");
     for (const emp of employees) {
       const scheduledHours = Object.values(schedule).reduce((total, daySchedule) => {
-        return total + (Object.values(daySchedule).find(s => s?.name === emp.name)?.duration || 0);
+        return total + Object.values(daySchedule).reduce((dayTotal, shift) => {
+          return dayTotal + (shift?.name === emp.name ? shiftDurations[shift.shiftType] : 0);
+        }, 0);
       }, 0);
-      
       const customHoursTotal = Object.values(customHours[emp.name] || {}).reduce((total, hours) => total + hours, 0);
       
       logDebug(`${emp.name}: ${scheduledHours} scheduled + ${customHoursTotal} custom = ${scheduledHours + customHoursTotal} total (goal: ${emp.hourGoal})`);
     }
 
-    setSchedule({ ...schedule });
+    // Optimization pass: Remove excess shifts to get closer to daily goals
+    logDebug("\n=== Starting Optimization Pass ===");
+    for (const day of days) {
+      if (dailyHourGoals[day] === 0) {
+        logDebug(`Skipping ${day} - zero hour goal`);
+        continue;
+      }
+
+      const currentDailyTotal = Object.values(schedule[day] || {}).reduce((total, shift) => total + (shift?.duration || 0), 0);
+      const difference = currentDailyTotal - dailyHourGoals[day];
+      
+      if (difference <= 0) {
+        logDebug(`${day}: No excess hours to remove (current: ${currentDailyTotal}, goal: ${dailyHourGoals[day]})`);
+        continue;
+      }
+
+      logDebug(`\nOptimizing ${day}:`);
+      logDebug(`  Current total: ${currentDailyTotal}`);
+      logDebug(`  Daily goal: ${dailyHourGoals[day]}`);
+      logDebug(`  Difference: ${difference}`);
+
+      // Create array of all shifts for this day, sorted by duration
+      const dayShifts = Object.entries(schedule[day] || {})
+        .filter(([_, shift]) => shift !== null)
+        .map(([shiftKey, shift]) => ({
+          shiftKey,
+          employee: shift.name,
+          duration: shiftDurations[shiftKey]
+        }))
+        .sort((a, b) => a.duration - b.duration);
+
+      logDebug(`  Available shifts to remove: ${dayShifts.map(s => `${s.employee}'s ${s.shiftKey} (${s.duration}h)`).join(', ')}`);
+
+      // Try removing each shift, starting with the smallest
+      let bestDifference = difference;
+      let bestShiftToRemove = null;
+
+      for (const shift of dayShifts) {
+        const newDifference = difference - shift.duration;
+        logDebug(`  Testing removal of ${shift.employee}'s ${shift.shiftKey} (${shift.duration}h):`);
+        logDebug(`    New difference would be: ${newDifference}`);
+
+        // If removing this shift gets us closer to the goal, keep track of it
+        if (Math.abs(newDifference) < Math.abs(bestDifference)) {
+          bestDifference = newDifference;
+          bestShiftToRemove = shift;
+          logDebug(`    This is better than current best difference of ${bestDifference}`);
+        }
+      }
+
+      // If we found a shift to remove that improves the schedule
+      if (bestShiftToRemove) {
+        logDebug(`  Removing ${bestShiftToRemove.employee}'s ${bestShiftToRemove.shiftKey} shift`);
+        schedule[day][bestShiftToRemove.shiftKey] = null;
+        
+        const newDailyTotal = Object.values(schedule[day] || {}).reduce((total, shift) => total + (shift?.duration || 0), 0);
+        logDebug(`  New daily total: ${newDailyTotal}`);
+        logDebug(`  New difference: ${newDailyTotal - dailyHourGoals[day]}`);
+      } else {
+        logDebug(`  No beneficial shifts to remove found`);
+      }
+    }
+
+    setSchedule(schedule);
   };
 
   const getScheduledHours = (employee, day) => {
