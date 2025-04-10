@@ -68,7 +68,7 @@ const App = () => {
           continue;
         }
 
-        // Sort: prioritize under-scheduled employees, then least flexible
+        // Sort: prioritize employees furthest from their goal (but within bounds), then least flexible
         const sorted = available
           .filter((emp) => {
             const scheduled = hoursScheduled[emp.name] || 0;
@@ -78,10 +78,21 @@ const App = () => {
           .sort((a, b) => {
             const hoursA = hoursScheduled[a.name] || 0;
             const hoursB = hoursScheduled[b.name] || 0;
+            const goalA = a.hourGoal || 40;
+            const goalB = b.hourGoal || 40;
             const flexA = countAvailableShifts(a);
             const flexB = countAvailableShifts(b);
 
-            if (hoursA !== hoursB) return hoursA - hoursB;
+            // Calculate how far each employee is from their goal
+            const distanceFromGoalA = Math.abs(hoursA - goalA);
+            const distanceFromGoalB = Math.abs(hoursB - goalB);
+
+            // First sort by distance from goal (closer to goal = lower priority)
+            if (distanceFromGoalA !== distanceFromGoalB) {
+              return distanceFromGoalB - distanceFromGoalA;
+            }
+
+            // If same distance from goal, prefer less flexible employees
             return flexA - flexB;
           });
 
