@@ -275,10 +275,10 @@ const App = () => {
             continue;
           }
 
-          // Check if employee has exceeded their hour goal by 8 hours
+          // Check if employee has exceeded their hour goal
           const currentHours = getTotalHoursForEmployee(emp.name);
-          if (currentHours >= emp.hourGoal + 8) {
-            debugLog.push(`  ${emp.name} has exceeded hour goal by 8+ hours (${currentHours}/${emp.hourGoal})`);
+          if (currentHours >= emp.hourGoal) {
+            debugLog.push(`  ${emp.name} has reached hour goal (${currentHours}/${emp.hourGoal})`);
             continue;
           }
 
