@@ -267,8 +267,15 @@ const App = () => {
         debugLog.push(`  Driver: ${requiredRoles.driver}`);
         debugLog.push(`  Insider: ${requiredRoles.insider}`);
 
-        // For each employee
-        for (const emp of employees) {
+        // Sort employees by current hours (ascending) to prioritize those with fewer hours
+        const sortedEmployees = [...employees].sort((a, b) => {
+          const hoursA = getTotalHoursForEmployee(a.name);
+          const hoursB = getTotalHoursForEmployee(b.name);
+          return hoursA - hoursB;
+        });
+
+        // For each employee (now sorted by hours)
+        for (const emp of sortedEmployees) {
           // Skip if employee is already assigned for this day
           if (assignedEmployees.has(emp.name)) {
             debugLog.push(`  ${emp.name} already assigned for ${day}`);
@@ -277,53 +284,53 @@ const App = () => {
 
           // Check if employee is available for this shift
           if (emp.availability?.[day]?.[shift]) {
-            // Calculate hours if this shift were added
             const currentHours = getTotalHoursForEmployee(emp.name);
             const shiftHours = shiftDurations[shift];
             const totalHoursAfterShift = currentHours + shiftHours;
 
-            // Only skip if adding this shift would exceed their hour goal
-            if (totalHoursAfterShift > emp.hourGoal) {
-              debugLog.push(`  ${emp.name} would exceed hour goal (${totalHoursAfterShift}/${emp.hourGoal})`);
-              continue;
-            }
-
             // Check if we still need this role
             if (emp.roles.manager && requiredRoles.manager > 0) {
-              newSchedule[day][shiftKey].push({
-                name: emp.name,
-                roles: emp.roles,
-                availability: emp.availability,
-                customTimes: emp.customTimes,
-                hourGoal: emp.hourGoal
-              });
-              requiredRoles.manager--;
-              assignedEmployees.add(emp.name);
-              debugLog.push(`  Assigned ${emp.name} as manager`);
+              // Only assign if they haven't reached their goal, or if no one else is available
+              if (currentHours < emp.hourGoal || requiredRoles.manager > 0) {
+                newSchedule[day][shiftKey].push({
+                  name: emp.name,
+                  roles: emp.roles,
+                  availability: emp.availability,
+                  customTimes: emp.customTimes,
+                  hourGoal: emp.hourGoal
+                });
+                requiredRoles.manager--;
+                assignedEmployees.add(emp.name);
+                debugLog.push(`  Assigned ${emp.name} as manager (${currentHours}/${emp.hourGoal} hours)`);
+              }
             }
             else if (emp.roles.driver && requiredRoles.driver > 0) {
-              newSchedule[day][shiftKey].push({
-                name: emp.name,
-                roles: emp.roles,
-                availability: emp.availability,
-                customTimes: emp.customTimes,
-                hourGoal: emp.hourGoal
-              });
-              requiredRoles.driver--;
-              assignedEmployees.add(emp.name);
-              debugLog.push(`  Assigned ${emp.name} as driver`);
+              if (currentHours < emp.hourGoal || requiredRoles.driver > 0) {
+                newSchedule[day][shiftKey].push({
+                  name: emp.name,
+                  roles: emp.roles,
+                  availability: emp.availability,
+                  customTimes: emp.customTimes,
+                  hourGoal: emp.hourGoal
+                });
+                requiredRoles.driver--;
+                assignedEmployees.add(emp.name);
+                debugLog.push(`  Assigned ${emp.name} as driver (${currentHours}/${emp.hourGoal} hours)`);
+              }
             }
             else if (emp.roles.insider && requiredRoles.insider > 0) {
-              newSchedule[day][shiftKey].push({
-                name: emp.name,
-                roles: emp.roles,
-                availability: emp.availability,
-                customTimes: emp.customTimes,
-                hourGoal: emp.hourGoal
-              });
-              requiredRoles.insider--;
-              assignedEmployees.add(emp.name);
-              debugLog.push(`  Assigned ${emp.name} as insider`);
+              if (currentHours < emp.hourGoal || requiredRoles.insider > 0) {
+                newSchedule[day][shiftKey].push({
+                  name: emp.name,
+                  roles: emp.roles,
+                  availability: emp.availability,
+                  customTimes: emp.customTimes,
+                  hourGoal: emp.hourGoal
+                });
+                requiredRoles.insider--;
+                assignedEmployees.add(emp.name);
+                debugLog.push(`  Assigned ${emp.name} as insider (${currentHours}/${emp.hourGoal} hours)`);
+              }
             }
           }
         }
