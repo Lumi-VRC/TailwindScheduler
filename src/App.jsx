@@ -200,26 +200,28 @@ const App = () => {
       logDebug("Processing shifts in order:", Object.keys(shifts).join(", "), "(by duration)");
 
       for (const [shiftKey, shift] of Object.entries(shifts)) {
-        logDebug(`\n--- Processing ${shiftKey} shift (${shift.duration} hours) ---`);
+        logDebug(`\n--- Processing ${shiftKey} shift (${shiftDurations[shiftKey]} hours) ---`);
         logDebug("Current schedule for", day + ":", JSON.stringify(schedule[day] || {}));
 
         // Find available employees who haven't met their goal
         const availableEmployees = employees.filter(emp => {
           const scheduledHours = Object.values(schedule).reduce((total, daySchedule) => {
-            return total + (Object.values(daySchedule).find(s => s?.name === emp.name)?.duration || 0);
+            return total + Object.values(daySchedule).reduce((dayTotal, shift) => {
+              return dayTotal + (shift?.name === emp.name ? shiftDurations[shift.shift] : 0);
+            }, 0);
           }, 0);
           
           const dayCustomHours = customHours[emp.name]?.[day] || 0;
           const totalHours = scheduledHours + dayCustomHours;
-          const wouldExceedGoal = totalHours + shift.duration > emp.hourGoal;
+          const wouldExceedGoal = totalHours + shiftDurations[shiftKey] > emp.hourGoal;
 
           logDebug(`\nChecking ${emp.name}:`);
           logDebug(`  Scheduled hours: ${scheduledHours}`);
           logDebug(`  Custom hours: ${dayCustomHours}`);
           logDebug(`  Current total: ${totalHours}`);
           logDebug(`  Goal hours: ${emp.hourGoal}`);
-          logDebug(`  This shift: ${shiftKey} (${shift.duration} hours)`);
-          logDebug(`  Would be total: ${totalHours + shift.duration}`);
+          logDebug(`  This shift: ${shiftKey} (${shiftDurations[shiftKey]} hours)`);
+          logDebug(`  Would be total: ${totalHours + shiftDurations[shiftKey]}`);
           logDebug(`  Distance from goal: ${emp.hourGoal - totalHours}`);
           logDebug(`  Would exceed goal: ${wouldExceedGoal}`);
           logDebug(`  ${emp.name} regular availability: ${emp.availability?.[day]?.[shiftKey] ? "available" : "not available"}`);
@@ -254,7 +256,7 @@ const App = () => {
           if (!schedule[day]) schedule[day] = {};
           schedule[day][shiftKey] = {
             name: selectedEmployee.name,
-            duration: shift.duration,
+            duration: shiftDurations[shiftKey],
             availability: selectedEmployee.availability,
             customTimes: selectedEmployee.customTimes,
             roles: selectedEmployee.roles,
@@ -304,15 +306,15 @@ const App = () => {
           
           const dayCustomHours = customHours[emp.name]?.[day] || 0;
           const totalHours = scheduledHours + dayCustomHours;
-          const wouldExceedGoal = totalHours + shift.duration > emp.hourGoal;
+          const wouldExceedGoal = totalHours + shiftDurations[shiftKey] > emp.hourGoal;
 
           logDebug(`\nChecking ${emp.name} for ${shiftKey} shift:`);
           logDebug(`  Scheduled hours: ${scheduledHours}`);
           logDebug(`  Custom hours: ${dayCustomHours}`);
           logDebug(`  Current total: ${totalHours}`);
           logDebug(`  Goal hours: ${emp.hourGoal}`);
-          logDebug(`  This shift: ${shiftKey} (${shift.duration} hours)`);
-          logDebug(`  Would be total: ${totalHours + shift.duration}`);
+          logDebug(`  This shift: ${shiftKey} (${shiftDurations[shiftKey]} hours)`);
+          logDebug(`  Would be total: ${totalHours + shiftDurations[shiftKey]}`);
           logDebug(`  Would exceed goal: ${wouldExceedGoal}`);
           if (emp.customTimes?.[day]) {
             logDebug(`  Has custom time: does not match shift`);
@@ -349,7 +351,7 @@ const App = () => {
           if (!schedule[day]) schedule[day] = {};
           schedule[day][shiftKey] = {
             name: selectedEmployee.name,
-            duration: shift.duration,
+            duration: shiftDurations[shiftKey],
             availability: selectedEmployee.availability,
             customTimes: selectedEmployee.customTimes,
             roles: selectedEmployee.roles,
