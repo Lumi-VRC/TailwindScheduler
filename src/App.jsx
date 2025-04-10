@@ -44,17 +44,38 @@ const App = () => {
   const [schedule, setSchedule] = useState(() => {
     try {
       const saved = localStorage.getItem("schedule");
-      if (!saved) return {};
+      if (!saved) {
+        // Initialize with empty schedule structure
+        const emptySchedule = {};
+        days.forEach(day => {
+          emptySchedule[day] = {};
+          Object.keys(shifts).forEach(shiftKey => {
+            emptySchedule[day][shiftKey] = null;
+          });
+        });
+        return emptySchedule;
+      }
       const parsed = JSON.parse(saved);
       // Ensure the parsed schedule has the correct structure
       const validSchedule = {};
       days.forEach(day => {
-        validSchedule[day] = parsed[day] || {};
+        validSchedule[day] = {};
+        Object.keys(shifts).forEach(shiftKey => {
+          validSchedule[day][shiftKey] = parsed[day]?.[shiftKey] || null;
+        });
       });
       return validSchedule;
     } catch (error) {
       console.error("Error loading schedule from localStorage:", error);
-      return {};
+      // Return empty schedule structure on error
+      const emptySchedule = {};
+      days.forEach(day => {
+        emptySchedule[day] = {};
+        Object.keys(shifts).forEach(shiftKey => {
+          emptySchedule[day][shiftKey] = null;
+        });
+      });
+      return emptySchedule;
     }
   });
   const [editingIndex, setEditingIndex] = useState(null);
@@ -220,6 +241,9 @@ const App = () => {
       // Initialize newSchedule with empty objects for each day
       days.forEach(day => {
         newSchedule[day] = {};
+        Object.keys(shifts).forEach(shiftKey => {
+          newSchedule[day][shiftKey] = null;
+        });
       });
 
       // Pre-calculate custom time hours for each employee
