@@ -133,9 +133,13 @@ const App = () => {
 
       for (const shiftKey of Object.keys(shifts)) {
         const available = empList.filter((e) => {
-          // Check if employee has a custom time for this day
+          // First check if they're already at or over their goal with custom times
+          const goal = e.hourGoal === 999 ? 40 : e.hourGoal;
+          const upperBound = e.hourGoal === 999 ? 999 : goal + 8;
+          if (customHours[e.name] >= upperBound) return false;
+
+          // Then check if they have a custom time for this day
           const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
-          // If they have a custom time, only make them available if it matches this shift type
           if (hasCustomTime) {
             return e.customTimes[day].shiftType === shiftKey;
           }
