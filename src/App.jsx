@@ -8,6 +8,12 @@ const shifts = {
   Closing: "5pm - 1am",
 };
 
+const shiftColors = {
+  Opening: "bg-blue-100",
+  Midshift: "bg-green-100",
+  Closing: "bg-red-100",
+};
+
 const shiftDurations = {
   Opening: 8,
   Midshift: 5,
@@ -197,6 +203,33 @@ const App = () => {
     writeFile(wb, "schedule.xlsx");
   };
 
+  const isDayCovered = (day) => {
+    const daySchedule = schedule[day] || {};
+    
+    // Check manager coverage
+    const hasOpeningManager = Object.entries(daySchedule)
+      .find(([shift, emp]) => shift === "Opening" && emp?.roles?.manager);
+    const hasClosingManager = Object.entries(daySchedule)
+      .find(([shift, emp]) => shift === "Closing" && emp?.roles?.manager);
+    
+    if (!hasOpeningManager || !hasClosingManager) return false;
+
+    // Check driver and insider coverage for each shift
+    const shifts = ["Opening", "Midshift", "Closing"];
+    for (const shift of shifts) {
+      const shiftEmployees = Object.entries(daySchedule)
+        .filter(([s, emp]) => s === shift && emp)
+        .map(([_, emp]) => emp);
+      
+      const hasDriver = shiftEmployees.some(emp => emp.roles?.driver);
+      const hasInsider = shiftEmployees.some(emp => emp.roles?.insider);
+      
+      if (!hasDriver || !hasInsider) return false;
+    }
+
+    return true;
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Smart Shift Scheduler</h1>
@@ -305,7 +338,10 @@ const App = () => {
                           ([, val]) => val?.name === emp.name
                         );
                         return (
-                          <td key={day} className="border p-2 text-sm text-center">
+                          <td 
+                            key={day} 
+                            className={`border p-2 text-sm text-center ${assignedShift ? shiftColors[assignedShift[0]] : ""}`}
+                          >
                             {assignedShift ? shifts[assignedShift[0]] : ""}
                           </td>
                         );
@@ -330,6 +366,16 @@ const App = () => {
                 </React.Fragment>
               );
             })}
+            {/* Coverage Row */}
+            <tr>
+              <td className="border p-2 font-bold">Covered</td>
+              {days.map((day) => (
+                <td key={day} className="border p-2 text-center">
+                  {isDayCovered(day) ? "Yes" : "No"}
+                </td>
+              ))}
+              <td className="border p-2" colSpan="2"></td>
+            </tr>
           </tbody>
         </table>
       </div>
