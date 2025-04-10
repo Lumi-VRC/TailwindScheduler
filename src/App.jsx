@@ -144,10 +144,16 @@ const App = () => {
 
   const getDailyTotalHours = (day) => {
     let total = 0;
+    logDebug(`\nCalculating daily total for ${day}:`);
+    
     // Add regular shift hours
     for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
-      if (emp) total += shiftDurations[shiftKey];
+      if (emp) {
+        total += shiftDurations[shiftKey];
+        logDebug(`- ${emp.name} working ${shiftKey} (${shiftDurations[shiftKey]} hours)`);
+      }
     }
+    
     // Add custom time hours
     employees.forEach(emp => {
       const customTime = emp.customTimes?.[day];
@@ -155,9 +161,14 @@ const App = () => {
         const start = new Date(`2000-01-01T${customTime.start}`);
         const end = new Date(`2000-01-01T${customTime.end}`);
         const diff = (end - start) / (1000 * 60 * 60);
-        if (diff > 0) total += diff;
+        if (diff > 0) {
+          total += diff;
+          logDebug(`- ${emp.name} custom time (${diff} hours)`);
+        }
       }
     });
+    
+    logDebug(`Total hours for ${day}: ${total}`);
     return total;
   };
 
