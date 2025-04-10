@@ -146,7 +146,10 @@ const App = () => {
     let total = 0;
     // Add regular shift hours
     for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
-      if (emp) total += shiftDurations[shiftKey];
+      if (emp) {
+        total += shiftDurations[shiftKey];
+        logDebug(`  Adding ${shiftDurations[shiftKey]} hours from ${shiftKey} shift (${emp.name})`);
+      }
     }
     // Add custom time hours
     employees.forEach(emp => {
@@ -155,9 +158,13 @@ const App = () => {
         const start = new Date(`2000-01-01T${customTime.start}`);
         const end = new Date(`2000-01-01T${customTime.end}`);
         const diff = (end - start) / (1000 * 60 * 60);
-        if (diff > 0) total += diff;
+        if (diff > 0) {
+          total += diff;
+          logDebug(`  Adding ${diff} hours from custom time (${emp.name})`);
+        }
       }
     });
+    logDebug(`Total hours for ${day}: ${total}`);
     return total;
   };
 
@@ -399,6 +406,15 @@ const App = () => {
           newSchedule[day][shiftKey] = picked;
           hoursScheduled[picked.name] = (hoursScheduled[picked.name] || 0) + shiftDurations[shiftKey];
           logDebug(`Updated hours for ${picked.name}: ${hoursScheduled[picked.name]}`);
+          
+          // Update current daily total after assignment
+          const newDailyTotal = getDailyTotalHours(day);
+          logDebug(`New daily total for ${day}: ${newDailyTotal}`);
+          
+          if (newDailyTotal >= dailyMax) {
+            logDebug(`Daily total (${newDailyTotal}) >= max (${dailyMax}), stopping assignments for ${day}`);
+            break;
+          }
         }
       }
     }
