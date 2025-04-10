@@ -118,6 +118,25 @@ const App = () => {
     }, 0);
   };
 
+  const getDailyTotalHours = (day) => {
+    let total = 0;
+    // Add regular shift hours
+    for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
+      if (emp) total += shiftDurations[shiftKey];
+    }
+    // Add custom time hours
+    employees.forEach(emp => {
+      const customTime = emp.customTimes?.[day];
+      if (customTime?.start && customTime?.end) {
+        const start = new Date(`2000-01-01T${customTime.start}`);
+        const end = new Date(`2000-01-01T${customTime.end}`);
+        const diff = (end - start) / (1000 * 60 * 60);
+        if (diff > 0) total += diff;
+      }
+    });
+    return total;
+  };
+
   const generateSchedule = (empList = employees) => {
     const hoursScheduled = {};
     const newSchedule = {};
@@ -137,94 +156,61 @@ const App = () => {
       }
     });
 
-    // Calculate current daily hours (store total)
-    const currentDailyHours = {};
-    days.forEach(day => {
-      currentDailyHours[day] = 0;
-      // Add hours from custom times
-      empList.forEach(emp => {
-        const customTime = emp.customTimes?.[day];
-        if (customTime?.start && customTime?.end) {
-          const start = new Date(`2000-01-01T${customTime.start}`);
-          const end = new Date(`2000-01-01T${customTime.end}`);
-          const diff = (end - start) / (1000 * 60 * 60);
-          if (diff > 0) currentDailyHours[day] += diff;
-        }
-      });
-    });
-
     for (const day of days) {
       newSchedule[day] = {};
+      const dailyGoal = dailyHourGoals[day];
+      const dailyMin = dailyGoal - 8;
+      const dailyMax = dailyGoal + 8;
 
       for (const shiftKey of Object.keys(shifts)) {
-        const available = empList.filter((e) => {
-          // Calculate total hours (scheduled + custom)
+        // First try to find employees who haven't met their goal
+        let available = empList.filter((e) => {
           const scheduled = hoursScheduled[e.name] || 0;
           const custom = customHours[e.name] || 0;
           const total = scheduled + custom;
-          
-          // Check if total hours are at or over goal
           const goal = e.hourGoal === 999 ? 40 : e.hourGoal;
-          const upperBound = e.hourGoal === 999 ? 999 : goal + 8;
           
-          // Get store's daily hour goal
-          const dailyGoal = dailyHourGoals[day];
-          const dailyUpperBound = dailyGoal + 8;
-          const dailyLowerBound = dailyGoal - 8;
-          
-          if (currentDailyHours[day] < dailyLowerBound) {
-            // If store hours are below lower bound, allow scheduling even if over employee goal
-            return scheduled + custom + shiftDurations[shiftKey] <= upperBound;
-          } else if (currentDailyHours[day] >= dailyUpperBound) {
-            // If store hours are above upper bound, don't schedule anyone
-            return false;
-          } else {
-            // Otherwise, respect employee goals
-            return total < goal;
-          }
+          // If they're at or over their goal, don't consider them yet
+          if (total >= goal) return false;
 
-          // Then check if they have a custom time for this day
+          // Check availability
           const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
           if (hasCustomTime) {
             return e.customTimes[day].shiftType === shiftKey;
           }
-          // Otherwise check regular availability
           return e.availability?.[day]?.[shiftKey];
         });
+
+        // If no one available who hasn't met their goal, check if we need more hours
+        if (available.length === 0) {
+          const currentDailyTotal = getDailyTotalHours(day);
+          if (currentDailyTotal < dailyMin) {
+            // We need more hours, consider everyone
+            available = empList.filter((e) => {
+              const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
+              if (hasCustomTime) {
+                return e.customTimes[day].shiftType === shiftKey;
+              }
+              return e.availability?.[day]?.[shiftKey];
+            });
+          }
+        }
 
         if (available.length === 0) {
           newSchedule[day][shiftKey] = null;
           continue;
         }
 
-        // Sort: prioritize employees furthest from their goal (but within bounds), then least flexible
+        // Sort: prioritize employees furthest from their goal
         const sorted = available
-          .filter((emp) => {
-            const scheduled = hoursScheduled[emp.name] || 0;
-            const custom = customHours[emp.name] || 0;
-            const goal = emp.hourGoal === 999 ? 40 : emp.hourGoal;
-            const upperBound = emp.hourGoal === 999 ? 999 : goal + 8;
-            return scheduled + custom + shiftDurations[shiftKey] <= upperBound;
-          })
           .sort((a, b) => {
             const hoursA = (hoursScheduled[a.name] || 0) + (customHours[a.name] || 0);
             const hoursB = (hoursScheduled[b.name] || 0) + (customHours[b.name] || 0);
             const goalA = a.hourGoal === 999 ? 40 : a.hourGoal;
             const goalB = b.hourGoal === 999 ? 40 : b.hourGoal;
-            const flexA = countAvailableShifts(a);
-            const flexB = countAvailableShifts(b);
-
-            // Calculate how far each employee is from their goal
             const distanceFromGoalA = Math.abs(hoursA - goalA);
             const distanceFromGoalB = Math.abs(hoursB - goalB);
-
-            // First sort by distance from goal (closer to goal = lower priority)
-            if (distanceFromGoalA !== distanceFromGoalB) {
-              return distanceFromGoalB - distanceFromGoalA;
-            }
-
-            // If same distance from goal, prefer less flexible employees
-            return flexA - flexB;
+            return distanceFromGoalB - distanceFromGoalA;
           });
 
         const alreadyAssigned = new Set(
@@ -235,7 +221,6 @@ const App = () => {
         if (picked) {
           newSchedule[day][shiftKey] = picked;
           hoursScheduled[picked.name] = (hoursScheduled[picked.name] || 0) + shiftDurations[shiftKey];
-          currentDailyHours[day] += shiftDurations[shiftKey];
         } else {
           newSchedule[day][shiftKey] = null;
         }
@@ -372,31 +357,6 @@ const App = () => {
     return employees.filter(emp => emp.availability?.[day]?.[shiftKey])
       .map(emp => emp.name)
       .join(", ");
-  };
-
-  // Add function to calculate daily store hours
-  const getDailyStoreHours = (day) => {
-    let total = 0;
-    
-    // Add hours from scheduled shifts
-    for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
-      if (emp) {
-        total += shiftDurations[shiftKey];
-      }
-    }
-    
-    // Add hours from custom times
-    employees.forEach(emp => {
-      const customTime = emp.customTimes?.[day];
-      if (customTime?.start && customTime?.end) {
-        const start = new Date(`2000-01-01T${customTime.start}`);
-        const end = new Date(`2000-01-01T${customTime.end}`);
-        const diff = (end - start) / (1000 * 60 * 60);
-        if (diff > 0) total += diff;
-      }
-    });
-    
-    return total;
   };
 
   return (
@@ -547,22 +507,22 @@ const App = () => {
         </button>
       </div>
 
-      {/* Daily Hour Goals */}
+      {/* Add Daily Hour Goals */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-6">
-        <h2 className="text-lg font-semibold mb-4">Daily Hour Goals</h2>
+        <h2 className="text-lg font-bold mb-4">Daily Hour Goals</h2>
         <div className="grid grid-cols-7 gap-4">
-          {days.map((day) => (
+          {days.map(day => (
             <div key={day} className="flex flex-col">
               <label className="text-sm font-medium mb-1">{day}</label>
               <input
                 type="number"
-                min="0"
                 value={dailyHourGoals[day]}
                 onChange={(e) => setDailyHourGoals(prev => ({
                   ...prev,
                   [day]: parseInt(e.target.value) || 0
                 }))}
                 className="border p-2 rounded text-black"
+                min="0"
               />
             </div>
           ))}
@@ -650,15 +610,16 @@ const App = () => {
               ))}
               <td className="border p-2" colSpan="2"></td>
             </tr>
-            {/* Daily Totals Row */}
+            {/* Add Daily Total Hours Row */}
             <tr className="bg-gray-100 dark:bg-gray-700 font-bold">
-              <td className="border p-2">Store Total Hours</td>
-              {days.map((day) => (
+              <td className="border p-2">Daily Total Hours</td>
+              {days.map(day => (
                 <td key={day} className="border p-2 text-center">
-                  {getDailyStoreHours(day)} hrs
+                  {getDailyTotalHours(day)}
                 </td>
               ))}
-              <td className="border p-2" colSpan="2"></td>
+              <td className="border p-2"></td>
+              <td className="border p-2"></td>
             </tr>
           </tbody>
         </table>
