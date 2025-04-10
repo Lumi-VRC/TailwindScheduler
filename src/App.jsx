@@ -9,9 +9,9 @@ const shifts = {
 };
 
 const shiftColors = {
-  Opening: "bg-blue-100",
-  Midshift: "bg-green-100",
-  Closing: "bg-red-100",
+  Opening: "bg-blue-200 dark:bg-blue-800",
+  Midshift: "bg-green-200 dark:bg-green-800",
+  Closing: "bg-red-200 dark:bg-red-800",
 };
 
 const shiftDurations = {
@@ -231,11 +231,23 @@ const App = () => {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto dark:bg-gray-900 dark:text-white">
       <h1 className="text-2xl font-bold mb-4">Smart Shift Scheduler</h1>
 
+      {/* Dark Mode Toggle */}
+      <div className="mb-4">
+        <button
+          onClick={() => {
+            document.documentElement.classList.toggle('dark');
+          }}
+          className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
+        >
+          Toggle Dark Mode
+        </button>
+      </div>
+
       {/* Form */}
-      <div className="bg-white rounded-lg p-4 shadow mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-6">
         <input
           className="border p-2 mr-4"
           value={name}
@@ -310,12 +322,12 @@ const App = () => {
         <table className="table-auto border-collapse w-full mb-4">
           <thead>
             <tr>
-              <th className="border p-2 bg-gray-100">Employee</th>
+              <th className="border p-2 bg-gray-100 dark:bg-gray-700">Employee</th>
               {days.map((day) => (
-                <th key={day} className="border p-2 bg-gray-100">{day}</th>
+                <th key={day} className="border p-2 bg-gray-100 dark:bg-gray-700">{day}</th>
               ))}
-              <th className="border p-2 bg-gray-100">Total Hours</th>
-              <th className="border p-2 bg-gray-100">Actions</th>
+              <th className="border p-2 bg-gray-100 dark:bg-gray-700">Total Hours</th>
+              <th className="border p-2 bg-gray-100 dark:bg-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -326,7 +338,7 @@ const App = () => {
               return (
                 <React.Fragment key={roleKey}>
                   <tr>
-                    <td colSpan={days.length + 3} className="bg-gray-200 font-bold p-2 text-left">
+                    <td colSpan={days.length + 3} className="bg-gray-200 dark:bg-gray-600 font-bold p-2 text-left">
                       {roleKey.charAt(0).toUpperCase() + roleKey.slice(1)}
                     </td>
                   </tr>
