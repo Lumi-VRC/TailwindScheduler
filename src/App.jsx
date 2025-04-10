@@ -494,6 +494,7 @@ const App = () => {
 
   const isDayCovered = (day) => {
     const daySchedule = schedule[day] || {};
+    const reasons = [];
     
     // Check manager coverage
     const hasOpeningManager = Object.entries(daySchedule)
@@ -501,22 +502,62 @@ const App = () => {
     const hasClosingManager = Object.entries(daySchedule)
       .find(([shift, emp]) => shift === "Closing" && emp?.roles?.manager);
     
-    if (!hasOpeningManager || !hasClosingManager) return false;
+    if (!hasOpeningManager) reasons.push("Missing Opening Manager");
+    if (!hasClosingManager) reasons.push("Missing Closing Manager");
 
-    // Check driver and insider coverage for each shift
-    const shifts = ["Opening", "Midshift", "Closing"];
-    for (const shift of shifts) {
-      const shiftEmployees = Object.entries(daySchedule)
-        .filter(([s, emp]) => s === shift && emp)
-        .map(([_, emp]) => emp);
-      
-      const hasDriver = shiftEmployees.some(emp => emp.roles?.driver);
-      const hasInsider = shiftEmployees.some(emp => emp.roles?.insider);
-      
-      if (!hasDriver || !hasInsider) return false;
+    // Check driver coverage for each shift
+    const hasOpeningDriver = Object.entries(daySchedule)
+      .find(([shift, emp]) => shift === "Opening" && emp?.roles?.driver);
+    const hasMidshiftDriver = Object.entries(daySchedule)
+      .find(([shift, emp]) => shift === "Midshift" && emp?.roles?.driver);
+    const hasClosingDriver = Object.entries(daySchedule)
+      .find(([shift, emp]) => shift === "Closing" && emp?.roles?.driver);
+    
+    if (!hasOpeningDriver) reasons.push("Missing Opening Driver");
+    if (!hasMidshiftDriver) reasons.push("Missing Midshift Driver");
+    if (!hasClosingDriver) reasons.push("Missing Closing Driver");
+
+    // Check insider coverage for opening and midshift
+    const hasOpeningInsider = Object.entries(daySchedule)
+      .find(([shift, emp]) => shift === "Opening" && emp?.roles?.insider);
+    const hasMidshiftInsider = Object.entries(daySchedule)
+      .find(([shift, emp]) => shift === "Midshift" && emp?.roles?.insider);
+    
+    if (!hasOpeningInsider) reasons.push("Missing Opening Insider");
+    if (!hasMidshiftInsider) reasons.push("Missing Midshift Insider");
+
+    // Check if daily role requirements are met
+    for (const [shiftKey, shift] of Object.entries(shifts)) {
+      const requiredRoles = {
+        manager: roleRequirements[day].manager[shiftKey],
+        driver: roleRequirements[day].driver[shiftKey],
+        insider: roleRequirements[day].insider[shiftKey]
+      };
+
+      // Count current assignments for this shift
+      const currentAssignments = daySchedule[shiftKey] || {};
+      const currentRoles = {
+        manager: currentAssignments.roles?.manager ? 1 : 0,
+        driver: currentAssignments.roles?.driver ? 1 : 0,
+        insider: currentAssignments.roles?.insider ? 1 : 0
+      };
+
+      // Check if all required roles are met
+      if (currentRoles.manager < requiredRoles.manager) {
+        reasons.push(`Missing ${requiredRoles.manager} Manager(s) for ${shiftKey}`);
+      }
+      if (currentRoles.driver < requiredRoles.driver) {
+        reasons.push(`Missing ${requiredRoles.driver} Driver(s) for ${shiftKey}`);
+      }
+      if (currentRoles.insider < requiredRoles.insider) {
+        reasons.push(`Missing ${requiredRoles.insider} Insider(s) for ${shiftKey}`);
+      }
     }
 
-    return true;
+    return {
+      covered: reasons.length === 0,
+      reasons: reasons
+    };
   };
 
   const getAvailableEmployees = (day, shiftKey) => {
@@ -705,7 +746,7 @@ const App = () => {
                             }
                           }
                         }))}
-                        className="w-16 border p-1 rounded text-black"
+                        className="w-8 border p-1 rounded text-black"
                         min="0"
                       />
                     </div>
@@ -791,11 +832,29 @@ const App = () => {
             {/* Coverage Row */}
             <tr>
               <td className="border p-2 font-bold">Covered</td>
-              {days.map((day) => (
-                <td key={day} className="border p-2 text-center">
-                  {isDayCovered(day) ? "Yes" : "No"}
-                </td>
-              ))}
+              {days.map((day) => {
+                const coverage = isDayCovered(day);
+                return (
+                  <td 
+                    key={day} 
+                    className="border p-2 text-center relative group"
+                  >
+                    {coverage.covered ? "Yes" : (
+                      <span className="text-red-500 cursor-help">
+                        No
+                        <div className="absolute hidden group-hover:block z-10 w-64 p-2 bg-white text-black text-xs rounded shadow-lg">
+                          <div className="font-bold mb-1">Missing Requirements:</div>
+                          <ul className="list-disc list-inside">
+                            {coverage.reasons.map((reason, index) => (
+                              <li key={index}>{reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </span>
+                    )}
+                  </td>
+                );
+              })}
               <td className="border p-2" colSpan="2"></td>
             </tr>
           </tbody>
