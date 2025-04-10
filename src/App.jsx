@@ -320,7 +320,15 @@ const App = () => {
         continue;
       }
 
-      for (const shiftKey of Object.keys(shifts)) {
+      // Sort shifts by duration (longest first)
+      const sortedShifts = Object.entries(shifts)
+        .map(([key, value]) => ({ key, duration: shiftDurations[key] }))
+        .sort((a, b) => b.duration - a.duration)
+        .map(item => item.key);
+
+      logDebug(`Processing shifts in order: ${sortedShifts.join(', ')} (by duration)`);
+
+      for (const shiftKey of sortedShifts) {
         logDebug(`\n--- Processing ${shiftKey} shift for daily goals ---`);
         if (newSchedule[day][shiftKey]) {
           logDebug(`Shift ${shiftKey} already filled by ${newSchedule[day][shiftKey].name}, skipping`);
@@ -330,6 +338,33 @@ const App = () => {
         // Find available employees who can work this shift
         const available = empList.filter((e) => {
           logDebug(`\nChecking ${e.name} for ${shiftKey} shift:`);
+          const scheduled = hoursScheduled[e.name] || 0;
+          const custom = customHours[e.name] || 0;
+          const total = scheduled + custom;
+          const goal = e.hourGoal === 999 ? 40 : e.hourGoal;
+          const shiftHours = shiftDurations[shiftKey];
+          const wouldBeTotal = total + shiftHours;
+          
+          logDebug(`  Scheduled hours: ${scheduled}`);
+          logDebug(`  Custom hours: ${custom}`);
+          logDebug(`  Current total: ${total}`);
+          logDebug(`  Goal hours: ${goal}`);
+          logDebug(`  This shift: ${shiftKey} (${shiftHours} hours)`);
+          logDebug(`  Would be total: ${wouldBeTotal}`);
+          logDebug(`  Would exceed goal: ${wouldBeTotal > goal}`);
+
+          // If they're at or over their goal, don't consider them
+          if (total >= goal) {
+            logDebug(`  ${e.name} is at/over goal (${total} >= ${goal}), skipping`);
+            return false;
+          }
+
+          // If adding this shift would exceed their goal, don't consider them
+          if (wouldBeTotal > goal) {
+            logDebug(`  ${e.name} would exceed goal with this shift (${wouldBeTotal} > ${goal}), skipping`);
+            return false;
+          }
+
           const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
           if (hasCustomTime) {
             const matchesShift = e.customTimes[day].shiftType === shiftKey;
