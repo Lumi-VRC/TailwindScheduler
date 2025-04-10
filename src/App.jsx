@@ -230,6 +230,12 @@ const App = () => {
     return true;
   };
 
+  const getAvailableEmployees = (day, shiftKey) => {
+    return employees.filter(emp => emp.availability?.[day]?.[shiftKey])
+      .map(emp => emp.name)
+      .join(", ");
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto dark:bg-gray-900 dark:text-white">
       <h1 className="text-2xl font-bold mb-4">Smart Shift Scheduler</h1>
@@ -352,9 +358,12 @@ const App = () => {
                         return (
                           <td 
                             key={day} 
-                            className={`border p-2 text-sm text-center ${assignedShift ? shiftColors[assignedShift[0]] : ""}`}
+                            className={`border p-2 text-sm text-center relative group ${assignedShift ? shiftColors[assignedShift[0]] : ""}`}
                           >
                             {assignedShift ? shifts[assignedShift[0]] : ""}
+                            <div className="absolute hidden group-hover:block z-10 w-48 p-2 bg-white text-black text-xs rounded shadow-lg">
+                              Available: {getAvailableEmployees(day, assignedShift?.[0] || Object.keys(shifts)[0])}
+                            </div>
                           </td>
                         );
                       })}
