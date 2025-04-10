@@ -27,22 +27,26 @@ const App = () => {
 
   useEffect(() => {
     const saved = localStorage.getItem("employeeData");
-    if (saved) setEmployees(JSON.parse(saved));
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setEmployees(parsed);
+      generateSchedule(parsed);
+    }
   }, []);
 
   useEffect(() => {
     localStorage.setItem("employeeData", JSON.stringify(employees));
-    generateSchedule();
+    generateSchedule(employees);
   }, [employees]);
 
   // Add auto-refresh effect
   useEffect(() => {
     const refreshInterval = setInterval(() => {
-      generateSchedule();
-    }, 5000); // Refresh every 5 seconds
+      generateSchedule(employees);
+    }, 5000);
 
-    return () => clearInterval(refreshInterval); // Cleanup on unmount
-  }, []);
+    return () => clearInterval(refreshInterval);
+  }, [employees]);
 
   const toggleAvailability = (day, shiftKey) => {
     setAvailability((prev) => {
@@ -63,7 +67,7 @@ const App = () => {
     }, 0);
   };
 
-  const generateSchedule = () => {
+  const generateSchedule = (empList = employees) => {
     const hoursScheduled = {};
     const newSchedule = {};
 
@@ -71,7 +75,7 @@ const App = () => {
       newSchedule[day] = {};
 
       for (const shiftKey of Object.keys(shifts)) {
-        const available = employees.filter((e) => e.availability?.[day]?.[shiftKey]);
+        const available = empList.filter((e) => e.availability?.[day]?.[shiftKey]);
         if (available.length === 0) {
           newSchedule[day][shiftKey] = null;
           continue;
