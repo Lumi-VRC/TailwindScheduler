@@ -248,6 +248,9 @@ const App = () => {
     days.forEach(day => {
       debugLog.push(`\nProcessing ${day}:`);
       
+      // Track which employees have been assigned for this day
+      const assignedEmployees = new Set();
+      
       // For each shift
       ['Opening', 'Midshift', 'Closing'].forEach(shift => {
         const shiftKey = `${day}-${shift}`;
@@ -267,6 +270,12 @@ const App = () => {
 
         // For each employee
         for (const emp of employees) {
+          // Skip if employee is already assigned for this day
+          if (assignedEmployees.has(emp.name)) {
+            debugLog.push(`  ${emp.name} already assigned for ${day}`);
+            continue;
+          }
+
           // Check if employee has exceeded their hour goal by 8 hours
           const currentHours = getTotalHoursForEmployee(emp.name);
           if (currentHours >= emp.hourGoal + 8) {
@@ -286,6 +295,7 @@ const App = () => {
                 hourGoal: emp.hourGoal
               });
               requiredRoles.manager--;
+              assignedEmployees.add(emp.name);
               debugLog.push(`  Assigned ${emp.name} as manager`);
             }
             else if (emp.roles.driver && requiredRoles.driver > 0) {
@@ -297,6 +307,7 @@ const App = () => {
                 hourGoal: emp.hourGoal
               });
               requiredRoles.driver--;
+              assignedEmployees.add(emp.name);
               debugLog.push(`  Assigned ${emp.name} as driver`);
             }
             else if (emp.roles.insider && requiredRoles.insider > 0) {
@@ -308,6 +319,7 @@ const App = () => {
                 hourGoal: emp.hourGoal
               });
               requiredRoles.insider--;
+              assignedEmployees.add(emp.name);
               debugLog.push(`  Assigned ${emp.name} as insider`);
             }
           }
