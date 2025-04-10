@@ -480,8 +480,9 @@ const App = () => {
     };
   };
 
-  const getAvailableEmployees = (day, shiftKey) => {
-    return employees.filter(emp => emp.availability?.[day]?.[shiftKey])
+  const getAvailableEmployees = (day, shiftKey, role) => {
+    return employees
+      .filter(emp => emp.roles?.[role] && emp.availability?.[day]?.[shiftKey])
       .map(emp => emp.name)
       .join(", ");
   };
@@ -811,8 +812,24 @@ const App = () => {
                             }`}
                           >
                             {shiftDisplay}
-                            <div className="absolute hidden group-hover:block z-10 w-48 p-2 bg-white text-black text-xs rounded shadow-lg">
-                              Available: {getAvailableEmployees(day, assignedShifts[0]?.[0].split('-')[1] || Object.keys(shifts)[0])}
+                            <div className="absolute hidden group-hover:block z-10 w-64 p-2 bg-white text-black text-xs rounded shadow-lg">
+                              {assignedShifts.length === 0 ? (
+                                <>
+                                  <div className="font-bold mb-1">Available Openers:</div>
+                                  <div className="mb-2">{getAvailableEmployees(day, 'Opening', roleKey) || "None"}</div>
+                                  <div className="font-bold mb-1">Available Midshift:</div>
+                                  <div className="mb-2">{getAvailableEmployees(day, 'Midshift', roleKey) || "None"}</div>
+                                  <div className="font-bold mb-1">Available Closers:</div>
+                                  <div>{getAvailableEmployees(day, 'Closing', roleKey) || "None"}</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="font-bold mb-1">Available {assignedShifts[0][0].split('-')[1]}s:</div>
+                                  <div>
+                                    {getAvailableEmployees(day, assignedShifts[0][0].split('-')[1], roleKey) || "None"}
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </td>
                         );
