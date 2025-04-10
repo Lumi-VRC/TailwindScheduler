@@ -201,8 +201,16 @@ const App = () => {
       logDebug(`\n=== Processing ${day} (Goal: ${dailyHourGoals[day]} hours) ===`);
       newSchedule[day] = {};
 
-      for (const shiftKey of Object.keys(shifts)) {
-        logDebug(`\n--- Processing ${shiftKey} shift ---`);
+      // Sort shifts by duration (longest first)
+      const sortedShifts = Object.entries(shifts)
+        .map(([key, value]) => ({ key, duration: shiftDurations[key] }))
+        .sort((a, b) => b.duration - a.duration)
+        .map(item => item.key);
+
+      logDebug(`Processing shifts in order: ${sortedShifts.join(', ')} (by duration)`);
+
+      for (const shiftKey of sortedShifts) {
+        logDebug(`\n--- Processing ${shiftKey} shift (${shiftDurations[shiftKey]} hours) ---`);
         logDebug(`Current schedule for ${day}: ${JSON.stringify(newSchedule[day])}`);
         
         // First try to find employees who haven't met their goal
