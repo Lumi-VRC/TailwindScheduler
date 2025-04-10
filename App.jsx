@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { utils, writeFile } from "xlsx";
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -17,6 +17,17 @@ const App = () => {
     );
   };
 
+  useEffect(() => {
+  const saved = localStorage.getItem("employeeData");
+    if (saved) {
+      setEmployees(JSON.parse(saved));
+    }
+  }, []);
+  
+  useEffect(() => {
+    localStorage.setItem("employeeData", JSON.stringify(employees));
+  }, [employees]);
+  
   const addEmployee = () => {
     if (!name) return;
     setEmployees([
