@@ -137,16 +137,20 @@ const App = () => {
       }
     });
 
-    // Calculate current daily hours
+    // Calculate current daily hours (store total)
     const currentDailyHours = {};
     days.forEach(day => {
       currentDailyHours[day] = 0;
-      for (const shiftKey of Object.keys(shifts)) {
-        const emp = newSchedule[day]?.[shiftKey];
-        if (emp) {
-          currentDailyHours[day] += shiftDurations[shiftKey];
+      // Add hours from custom times
+      empList.forEach(emp => {
+        const customTime = emp.customTimes?.[day];
+        if (customTime?.start && customTime?.end) {
+          const start = new Date(`2000-01-01T${customTime.start}`);
+          const end = new Date(`2000-01-01T${customTime.end}`);
+          const diff = (end - start) / (1000 * 60 * 60);
+          if (diff > 0) currentDailyHours[day] += diff;
         }
-      }
+      });
     });
 
     for (const day of days) {
@@ -163,16 +167,16 @@ const App = () => {
           const goal = e.hourGoal === 999 ? 40 : e.hourGoal;
           const upperBound = e.hourGoal === 999 ? 999 : goal + 8;
           
-          // If daily hours are below goal, allow exceeding employee goals
+          // Get store's daily hour goal
           const dailyGoal = dailyHourGoals[day];
           const dailyUpperBound = dailyGoal + 8;
           const dailyLowerBound = dailyGoal - 8;
           
           if (currentDailyHours[day] < dailyLowerBound) {
-            // If daily hours are below lower bound, allow scheduling even if over employee goal
+            // If store hours are below lower bound, allow scheduling even if over employee goal
             return scheduled + custom + shiftDurations[shiftKey] <= upperBound;
           } else if (currentDailyHours[day] >= dailyUpperBound) {
-            // If daily hours are above upper bound, don't schedule anyone
+            // If store hours are above upper bound, don't schedule anyone
             return false;
           } else {
             // Otherwise, respect employee goals
@@ -368,6 +372,31 @@ const App = () => {
     return employees.filter(emp => emp.availability?.[day]?.[shiftKey])
       .map(emp => emp.name)
       .join(", ");
+  };
+
+  // Add function to calculate daily store hours
+  const getDailyStoreHours = (day) => {
+    let total = 0;
+    
+    // Add hours from scheduled shifts
+    for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
+      if (emp) {
+        total += shiftDurations[shiftKey];
+      }
+    }
+    
+    // Add hours from custom times
+    employees.forEach(emp => {
+      const customTime = emp.customTimes?.[day];
+      if (customTime?.start && customTime?.end) {
+        const start = new Date(`2000-01-01T${customTime.start}`);
+        const end = new Date(`2000-01-01T${customTime.end}`);
+        const diff = (end - start) / (1000 * 60 * 60);
+        if (diff > 0) total += diff;
+      }
+    });
+    
+    return total;
   };
 
   return (
@@ -617,6 +646,16 @@ const App = () => {
               {days.map((day) => (
                 <td key={day} className="border p-2 text-center">
                   {isDayCovered(day) ? "Yes" : "No"}
+                </td>
+              ))}
+              <td className="border p-2" colSpan="2"></td>
+            </tr>
+            {/* Daily Totals Row */}
+            <tr className="bg-gray-100 dark:bg-gray-700 font-bold">
+              <td className="border p-2">Store Total Hours</td>
+              {days.map((day) => (
+                <td key={day} className="border p-2 text-center">
+                  {getDailyStoreHours(day)} hrs
                 </td>
               ))}
               <td className="border p-2" colSpan="2"></td>
