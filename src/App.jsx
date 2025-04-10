@@ -184,158 +184,194 @@ const App = () => {
 
   const generateSchedule = () => {
     console.log("Starting schedule generation");
-    console.log(`Total employees: ${employees.length}\n`);
-
-    // Pre-calculate custom hours for each employee
-    const customHoursByEmployee = {};
+    console.log(`Total employees: ${employees.length}`);
+    console.log("\n=== Employee Analysis ===");
     employees.forEach(emp => {
-      const employeeObj = employees.find(e => e.name === emp.name);
-      customHoursByEmployee[emp.name] = 0;
-      if (employeeObj?.customTimes) {
-        console.log(`Analyzing ${emp.name}'s custom times:`);
-        Object.entries(employeeObj.customTimes).forEach(([day, times]) => {
-          times.forEach(time => {
-            const duration = calculateDuration(time.start, time.end);
-            customHoursByEmployee[emp.name] += duration;
-            console.log(`  ${day}: ${time.start}-${time.end} (${duration} hours) - Type: ${time.type}`);
-          });
-        });
-        console.log(`${emp.name} total custom hours: ${customHoursByEmployee[emp.name]}\n`);
-      } else {
-        console.log(`Analyzing ${emp.name}'s custom times:`);
-        console.log(`${emp.name} total custom hours: 0\n`);
-      }
+      console.log(`\nAnalyzing ${emp.name}:`);
+      console.log(`  Role: ${emp.role}`);
+      console.log(`  Goal Hours: ${emp.goalHours}`);
+      console.log(`  Regular Availability: ${JSON.stringify(emp.regularAvailability)}`);
+      console.log(`  Custom Times: ${JSON.stringify(emp.customTimes)}`);
     });
 
     const newSchedule = {};
-    const scheduledHours = {};
     const roleCounts = {};
+    const scheduledHours = {};
 
-    // Initialize scheduled hours and role counts
-    employees.forEach(emp => {
-      scheduledHours[emp.name] = 0;
+    // Initialize role counts and scheduled hours
+    days.forEach(day => {
+      roleCounts[day] = {
+        Opening: { manager: 0, driver: 0, insider: 0 },
+        Midshift: { manager: 0, driver: 0, insider: 0 },
+        Closing: { manager: 0, driver: 0, insider: 0 }
+      };
+      scheduledHours[day] = {};
     });
 
-    // First pass: Assign shifts based on employee goals
+    // First pass: Fill required roles
     days.forEach(day => {
       console.log(`\n=== Processing ${day} ===`);
-      newSchedule[day] = {};
-      roleCounts[day] = {};
-
+      
       // Process each shift type
-      Object.entries(shiftDurations).forEach(([shiftKey, duration]) => {
-        console.log(`\n--- Processing ${shiftKey} shift (${duration} hours) ---`);
-        const shiftType = shiftKey.split('_')[0]; // Extract shift type (Opening, Midshift, Closing)
-        const role = shiftKey.split('_')[1]; // Extract role (manager, driver, insider)
+      Object.keys(roleRequirements[day]).forEach(shiftType => {
+        console.log(`\n--- Processing ${shiftType} shift ---`);
+        const shiftDurations = {
+          Opening: 8,
+          Midshift: 8,
+          Closing: 8
+        };
 
-        // Get available employees for this shift
-        const availableEmployees = employees.filter(emp => {
-          const employeeObj = employees.find(e => e.name === emp.name);
-          const isAvailable = employeeObj?.availability?.[day]?.[shiftType] || false;
-          const currentTotal = scheduledHours[emp.name] + (customHoursByEmployee[emp.name] || 0);
-          const wouldBeTotal = currentTotal + duration;
-          const distanceFromGoal = emp.goalHours - currentTotal;
-          const wouldExceedGoal = wouldBeTotal > emp.goalHours;
+        // Get required roles for this shift
+        const requiredRoles = roleRequirements[day][shiftType];
+        console.log(`Required roles for ${shiftType}:`, requiredRoles);
 
-          console.log(`Checking ${emp.name}:`);
-          console.log(`  Scheduled hours: ${scheduledHours[emp.name]}`);
-          console.log(`  Custom hours: ${customHoursByEmployee[emp.name] || 0}`);
-          console.log(`  Current total: ${currentTotal}`);
-          console.log(`  Goal hours: ${emp.goalHours}`);
-          console.log(`  This shift: ${shiftType} (${duration} hours)`);
-          console.log(`  Would be total: ${wouldBeTotal}`);
-          console.log(`  Distance from goal: ${distanceFromGoal}`);
-          console.log(`  Would exceed goal: ${wouldExceedGoal}`);
-          console.log(`  ${emp.name} regular availability: ${isAvailable ? 'available' : 'not available'}`);
+        // Try to fill each required role
+        Object.entries(requiredRoles).forEach(([role, count]) => {
+          console.log(`\nFilling ${count} ${role}(s) for ${shiftType}`);
+          
+          for (let i = 0; i < count; i++) {
+            // Find available employees for this role
+            const availableEmployees = employees.filter(emp => {
+              const isAvailable = emp.regularAvailability[day]?.[shiftType] || 
+                                emp.customTimes[day]?.some(ct => ct.type === shiftType);
+              const hasRole = emp.role === role;
+              const currentHours = (scheduledHours[day][emp.name] || 0) + 
+                                 (emp.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0);
+              const wouldExceedGoal = currentHours + shiftDurations[shiftType] > emp.goalHours;
+              
+              if (emp.name === "Kaimyn") {
+                console.log(`\nChecking Kaimyn for ${shiftType} ${role}:`);
+                console.log(`  Is available: ${isAvailable}`);
+                console.log(`  Has correct role: ${hasRole}`);
+                console.log(`  Current hours: ${currentHours}`);
+                console.log(`  Would exceed goal: ${wouldExceedGoal}`);
+                console.log(`  Role counts: ${JSON.stringify(roleCounts[day][shiftType])}`);
+              }
 
-          return isAvailable && !wouldExceedGoal;
+              return isAvailable && hasRole && !wouldExceedGoal;
+            });
+
+            if (availableEmployees.length === 0) {
+              console.log(`No available ${role}s for ${shiftType} shift on ${day}`);
+              continue;
+            }
+
+            // Sort by distance from goal hours
+            availableEmployees.sort((a, b) => {
+              const aHours = (scheduledHours[day][a.name] || 0) + 
+                           (a.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0);
+              const bHours = (scheduledHours[day][b.name] || 0) + 
+                           (b.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0);
+              return (a.goalHours - aHours) - (b.goalHours - bHours);
+            });
+
+            const selectedEmployee = availableEmployees[0];
+            if (selectedEmployee.name === "Kaimyn") {
+              console.log(`\nKaimyn selected for ${shiftType} ${role} on ${day}`);
+              console.log(`  Current hours: ${scheduledHours[day][selectedEmployee.name] || 0}`);
+              console.log(`  Custom hours: ${selectedEmployee.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0}`);
+              console.log(`  Shift duration: ${shiftDurations[shiftType]}`);
+            }
+
+            // Initialize schedule for this day if needed
+            if (!newSchedule[day]) {
+              newSchedule[day] = {};
+            }
+
+            // Add employee to schedule
+            newSchedule[day][shiftType] = {
+              ...newSchedule[day][shiftType],
+              [role]: selectedEmployee.name
+            };
+
+            // Update role counts and scheduled hours
+            roleCounts[day][shiftType][role]++;
+            scheduledHours[day][selectedEmployee.name] = (scheduledHours[day][selectedEmployee.name] || 0) + shiftDurations[shiftType];
+          }
         });
-
-        // Sort by distance from goal (closest to goal first)
-        availableEmployees.sort((a, b) => {
-          const aDistance = a.goalHours - (scheduledHours[a.name] + (customHoursByEmployee[a.name] || 0));
-          const bDistance = b.goalHours - (scheduledHours[b.name] + (customHoursByEmployee[b.name] || 0));
-          return aDistance - bDistance;
-        });
-
-        // Find employee with matching role
-        const selectedEmployee = availableEmployees.find(emp => emp.role === role);
-        if (selectedEmployee) {
-          newSchedule[day][shiftKey] = selectedEmployee.name;
-          scheduledHours[selectedEmployee.name] += duration;
-          roleCounts[day][role] = (roleCounts[day][role] || 0) + 1;
-          console.log(`Selected ${selectedEmployee.name} for ${shiftType} shift as ${role}`);
-        } else {
-          console.log(`No available ${role}s for ${shiftType} shift`);
-        }
       });
     });
 
     // Second pass: Fill remaining shifts to meet daily goals
     days.forEach(day => {
-      Object.entries(shiftDurations).forEach(([shiftKey, duration]) => {
-        const shiftType = shiftKey.split('_')[0];
-        const role = shiftKey.split('_')[1];
-        const requiredCount = roleRequirements[day][role][shiftType];
+      console.log(`\n=== Filling missing roles for ${day} ===`);
+      Object.keys(roleRequirements[day]).forEach(shiftType => {
+        const requiredRoles = roleRequirements[day][shiftType];
+        const currentRoles = roleCounts[day][shiftType];
 
-        // Check if we need more employees for this role
-        if ((roleCounts[day][role] || 0) < requiredCount) {
-          console.log(`\n=== Filling missing roles for ${day} ${shiftType} ===`);
-          console.log(`Missing roles: ${role}`);
-          
-          // Get available employees who haven't exceeded their goal
-          const availableEmployees = employees.filter(emp => {
-            const employeeObj = employees.find(e => e.name === emp.name);
-            const isAvailable = employeeObj?.availability?.[day]?.[shiftType] || false;
-            const currentTotal = scheduledHours[emp.name] + (customHoursByEmployee[emp.name] || 0);
-            const wouldBeTotal = currentTotal + duration;
-            return isAvailable && wouldBeTotal <= emp.goalHours;
-          });
+        Object.entries(requiredRoles).forEach(([role, count]) => {
+          const missing = count - currentRoles[role];
+          if (missing > 0) {
+            console.log(`Missing ${missing} ${role}(s) for ${shiftType} shift on ${day}`);
+            
+            // Find available employees who could fill this role
+            const availableEmployees = employees.filter(emp => {
+              const isAvailable = emp.regularAvailability[day]?.[shiftType] || 
+                                emp.customTimes[day]?.some(ct => ct.type === shiftType);
+              const hasRole = emp.role === role;
+              const currentHours = (scheduledHours[day][emp.name] || 0) + 
+                                 (emp.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0);
+              
+              if (emp.name === "Kaimyn") {
+                console.log(`\nChecking Kaimyn for missing ${role} in ${shiftType}:`);
+                console.log(`  Is available: ${isAvailable}`);
+                console.log(`  Has correct role: ${hasRole}`);
+                console.log(`  Current hours: ${currentHours}`);
+                console.log(`  Role counts: ${JSON.stringify(roleCounts[day][shiftType])}`);
+              }
 
-          // Sort by distance from goal (furthest from goal first)
-          availableEmployees.sort((a, b) => {
-            const aDistance = a.goalHours - (scheduledHours[a.name] + (customHoursByEmployee[a.name] || 0));
-            const bDistance = b.goalHours - (scheduledHours[b.name] + (customHoursByEmployee[b.name] || 0));
-            return bDistance - aDistance;
-          });
+              return isAvailable && hasRole;
+            });
 
-          // Try to find an employee with the required role
-          let selectedEmployee = availableEmployees.find(emp => emp.role === role);
-          
-          // If no exact role match, try to find any available employee
-          if (!selectedEmployee) {
-            selectedEmployee = availableEmployees[0];
+            if (availableEmployees.length === 0) {
+              console.log(`No available employees to fill missing ${role} roles for ${shiftType} shift`);
+              return;
+            }
+
+            // Sort by current hours (prefer those with fewer hours)
+            availableEmployees.sort((a, b) => {
+              const aHours = (scheduledHours[day][a.name] || 0) + 
+                           (a.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0);
+              const bHours = (scheduledHours[day][b.name] || 0) + 
+                           (b.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0);
+              return aHours - bHours;
+            });
+
+            const selectedEmployee = availableEmployees[0];
+            if (selectedEmployee.name === "Kaimyn") {
+              console.log(`\nKaimyn selected to fill missing ${role} in ${shiftType} on ${day}`);
+              console.log(`  Current hours: ${scheduledHours[day][selectedEmployee.name] || 0}`);
+              console.log(`  Custom hours: ${selectedEmployee.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0}`);
+            }
+
+            // Add employee to schedule
+            newSchedule[day][shiftType] = {
+              ...newSchedule[day][shiftType],
+              [role]: selectedEmployee.name
+            };
+
+            // Update role counts and scheduled hours
+            roleCounts[day][shiftType][role]++;
+            scheduledHours[day][selectedEmployee.name] = (scheduledHours[day][selectedEmployee.name] || 0) + shiftDurations[shiftType];
           }
-
-          if (selectedEmployee) {
-            newSchedule[day][shiftKey] = selectedEmployee.name;
-            scheduledHours[selectedEmployee.name] += duration;
-            roleCounts[day][role] = (roleCounts[day][role] || 0) + 1;
-            console.log(`Selected ${selectedEmployee.name} for ${shiftType} shift to fill missing roles`);
-          } else {
-            console.log(`No available employees to fill missing roles for ${shiftType} shift`);
-          }
-        }
+        });
       });
     });
 
-    // Log final schedule
     console.log("\n=== Final Schedule Summary ===");
     days.forEach(day => {
       console.log(`\n${day}:`);
-      Object.entries(shiftDurations).forEach(([shiftKey, duration]) => {
-        const employee = newSchedule[day]?.[shiftKey];
-        if (employee) {
-          console.log(`  ${shiftKey.split('_')[0]}: ${employee}`);
-        }
+      Object.entries(newSchedule[day] || {}).forEach(([shiftType, roles]) => {
+        console.log(`  ${shiftType}: ${Object.entries(roles).map(([role, name]) => `${name} (${role})`).join(", ")}`);
       });
     });
 
-    // Log final hours summary
     console.log("\n=== Final Hours Summary ===");
     employees.forEach(emp => {
-      const customHours = customHoursByEmployee[emp.name] || 0;
-      console.log(`${emp.name}: ${scheduledHours[emp.name]} scheduled + ${customHours} custom = ${scheduledHours[emp.name] + customHours} total (goal: ${emp.goalHours})`);
+      const scheduled = days.reduce((total, day) => total + (scheduledHours[day][emp.name] || 0), 0);
+      const custom = days.reduce((total, day) => 
+        total + (emp.customTimes[day]?.reduce((sum, ct) => sum + ct.duration, 0) || 0), 0);
+      console.log(`${emp.name}: ${scheduled} scheduled + ${custom} custom = ${scheduled + custom} total (goal: ${emp.goalHours})`);
     });
 
     setSchedule(newSchedule);
