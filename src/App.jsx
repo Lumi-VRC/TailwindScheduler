@@ -251,7 +251,7 @@ const App = () => {
       // For each shift
       ['Opening', 'Midshift', 'Closing'].forEach(shift => {
         const shiftKey = `${day}-${shift}`;
-        newSchedule[day][shiftKey] = null;
+        newSchedule[day][shiftKey] = []; // Initialize as array to hold multiple employees
         
         // Get role requirements for this shift
         const requiredRoles = {
@@ -278,40 +278,37 @@ const App = () => {
           if (emp.availability?.[day]?.[shift]) {
             // Check if we still need this role
             if (emp.roles.manager && requiredRoles.manager > 0) {
-              newSchedule[day][shiftKey] = {
+              newSchedule[day][shiftKey].push({
                 name: emp.name,
                 roles: emp.roles,
                 availability: emp.availability,
                 customTimes: emp.customTimes,
                 hourGoal: emp.hourGoal
-              };
+              });
               requiredRoles.manager--;
               debugLog.push(`  Assigned ${emp.name} as manager`);
-              break;
             }
             else if (emp.roles.driver && requiredRoles.driver > 0) {
-              newSchedule[day][shiftKey] = {
+              newSchedule[day][shiftKey].push({
                 name: emp.name,
                 roles: emp.roles,
                 availability: emp.availability,
                 customTimes: emp.customTimes,
                 hourGoal: emp.hourGoal
-              };
+              });
               requiredRoles.driver--;
               debugLog.push(`  Assigned ${emp.name} as driver`);
-              break;
             }
             else if (emp.roles.insider && requiredRoles.insider > 0) {
-              newSchedule[day][shiftKey] = {
+              newSchedule[day][shiftKey].push({
                 name: emp.name,
                 roles: emp.roles,
                 availability: emp.availability,
                 customTimes: emp.customTimes,
                 hourGoal: emp.hourGoal
-              };
+              });
               requiredRoles.insider--;
               debugLog.push(`  Assigned ${emp.name} as insider`);
-              break;
             }
           }
         }
@@ -777,8 +774,8 @@ const App = () => {
                     <tr key={emp.name}>
                       <td className="border p-2">{emp.name}</td>
                       {days.map((day) => {
-                        const assignedShift = Object.entries(schedule[day] || {}).find(
-                          ([shiftKey, val]) => val?.name === emp.name
+                        const assignedShifts = Object.entries(schedule[day] || {}).filter(
+                          ([shiftKey, val]) => Array.isArray(val) && val.some(emp => emp.name === emp.name)
                         );
                         const customTime = emp.customTimes?.[day];
                         const shiftType = customTime?.shiftType;
@@ -788,13 +785,20 @@ const App = () => {
                           <td 
                             key={day} 
                             className={`border p-2 text-sm text-center relative group ${
-                              assignedShift ? shiftColors[assignedShift[0].split('-')[1]] : 
+                              assignedShifts.length > 0 ? shiftColors[assignedShifts[0][0].split('-')[1]] : 
                               customTime?.start && customTime?.end ? shiftColors[shiftType] : ""
                             }`}
                           >
-                            {assignedShift ? shifts[assignedShift[0].split('-')[1]] : customTimeDisplay}
+                            {assignedShifts.length > 0 ? 
+                              assignedShifts.map(([shiftKey, employees]) => 
+                                employees.filter(e => e.name === emp.name)
+                                  .map(e => shifts[shiftKey.split('-')[1]])
+                                  .join(', ')
+                              ).join(', ') : 
+                              customTimeDisplay
+                            }
                             <div className="absolute hidden group-hover:block z-10 w-48 p-2 bg-white text-black text-xs rounded shadow-lg">
-                              Available: {getAvailableEmployees(day, assignedShift?.[0].split('-')[1] || Object.keys(shifts)[0])}
+                              Available: {getAvailableEmployees(day, assignedShifts[0]?.[0].split('-')[1] || Object.keys(shifts)[0])}
                             </div>
                           </td>
                         );
