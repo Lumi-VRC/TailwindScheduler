@@ -113,11 +113,36 @@ const App = () => {
     const hoursScheduled = {};
     const newSchedule = {};
 
+    // Pre-calculate custom time hours for each employee
+    const customHours = {};
+    empList.forEach(emp => {
+      customHours[emp.name] = 0;
+      for (const day of days) {
+        const customTime = emp.customTimes?.[day];
+        if (customTime?.start && customTime?.end) {
+          const start = new Date(`2000-01-01T${customTime.start}`);
+          const end = new Date(`2000-01-01T${customTime.end}`);
+          const diff = (end - start) / (1000 * 60 * 60);
+          if (diff > 0) customHours[emp.name] += diff;
+        }
+      }
+    });
+
     for (const day of days) {
       newSchedule[day] = {};
 
       for (const shiftKey of Object.keys(shifts)) {
-        const available = empList.filter((e) => e.availability?.[day]?.[shiftKey]);
+        const available = empList.filter((e) => {
+          // Check if employee has a custom time for this day
+          const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
+          // If they have a custom time, only make them available if it matches this shift type
+          if (hasCustomTime) {
+            return e.customTimes[day].shiftType === shiftKey;
+          }
+          // Otherwise check regular availability
+          return e.availability?.[day]?.[shiftKey];
+        });
+
         if (available.length === 0) {
           newSchedule[day][shiftKey] = null;
           continue;
@@ -127,13 +152,14 @@ const App = () => {
         const sorted = available
           .filter((emp) => {
             const scheduled = hoursScheduled[emp.name] || 0;
+            const custom = customHours[emp.name] || 0;
             const goal = emp.hourGoal === 999 ? 40 : emp.hourGoal;
             const upperBound = emp.hourGoal === 999 ? 999 : goal + 8;
-            return scheduled + shiftDurations[shiftKey] <= upperBound;
+            return scheduled + custom + shiftDurations[shiftKey] <= upperBound;
           })
           .sort((a, b) => {
-            const hoursA = hoursScheduled[a.name] || 0;
-            const hoursB = hoursScheduled[b.name] || 0;
+            const hoursA = (hoursScheduled[a.name] || 0) + (customHours[a.name] || 0);
+            const hoursB = (hoursScheduled[b.name] || 0) + (customHours[b.name] || 0);
             const goalA = a.hourGoal === 999 ? 40 : a.hourGoal;
             const goalB = b.hourGoal === 999 ? 40 : b.hourGoal;
             const flexA = countAvailableShifts(a);
