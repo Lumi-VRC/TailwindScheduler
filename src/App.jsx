@@ -198,7 +198,7 @@ const App = () => {
       // For each shift
       ['Opening', 'Midshift', 'Closing'].forEach(shift => {
         const shiftKey = `${day}-${shift}`;
-        newSchedule[day][shiftKey] = [];
+        newSchedule[day][shiftKey] = null; // Initialize as null instead of array
         
         // Get role requirements for this shift
         const requiredRoles = {
@@ -213,27 +213,48 @@ const App = () => {
         debugLog.push(`  Insider: ${requiredRoles.insider}`);
 
         // For each employee
-        employees.forEach(emp => {
+        for (const emp of employees) {
           // Check if employee is available for this shift
           if (emp.availability[day]?.[shift]) {
             // Check if we still need this role
             if (emp.roles.manager && requiredRoles.manager > 0) {
-              newSchedule[day][shiftKey].push(emp.name);
+              newSchedule[day][shiftKey] = {
+                name: emp.name,
+                roles: emp.roles,
+                availability: emp.availability,
+                customTimes: emp.customTimes,
+                hourGoal: emp.hourGoal
+              };
               requiredRoles.manager--;
               debugLog.push(`  Assigned ${emp.name} as manager`);
+              break; // Stop after assigning one employee
             }
             else if (emp.roles.driver && requiredRoles.driver > 0) {
-              newSchedule[day][shiftKey].push(emp.name);
+              newSchedule[day][shiftKey] = {
+                name: emp.name,
+                roles: emp.roles,
+                availability: emp.availability,
+                customTimes: emp.customTimes,
+                hourGoal: emp.hourGoal
+              };
               requiredRoles.driver--;
               debugLog.push(`  Assigned ${emp.name} as driver`);
+              break; // Stop after assigning one employee
             }
             else if (emp.roles.insider && requiredRoles.insider > 0) {
-              newSchedule[day][shiftKey].push(emp.name);
+              newSchedule[day][shiftKey] = {
+                name: emp.name,
+                roles: emp.roles,
+                availability: emp.availability,
+                customTimes: emp.customTimes,
+                hourGoal: emp.hourGoal
+              };
               requiredRoles.insider--;
               debugLog.push(`  Assigned ${emp.name} as insider`);
+              break; // Stop after assigning one employee
             }
           }
-        });
+        }
 
         // Log remaining requirements
         if (requiredRoles.manager > 0 || requiredRoles.driver > 0 || requiredRoles.insider > 0) {
