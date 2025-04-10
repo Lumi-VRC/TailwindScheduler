@@ -45,19 +45,25 @@ const App = () => {
   const [editingIndex, setEditingIndex] = useState(null);
   const [debugLog, setDebugLog] = useState([]);
   const [showDebug, setShowDebug] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem("darkMode");
+    return saved === "true";
+  });
 
   // Load dark mode preference
   useEffect(() => {
-    const isDark = localStorage.getItem("darkMode") === "true";
-    if (isDark) {
+    if (isDarkMode) {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
-  }, []);
+  }, [isDarkMode]);
 
   // Save dark mode preference
   const toggleDarkMode = () => {
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem("darkMode", isDark.toString());
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    localStorage.setItem("darkMode", newDarkMode.toString());
   };
 
   // Save daily hour goals when they change
@@ -89,16 +95,13 @@ const App = () => {
   }, [employees]);
 
   const toggleAvailability = (day, shiftKey) => {
-    setAvailability((prev) => {
-      const currentDay = prev[day] || {};
-      return {
-        ...prev,
-        [day]: {
-          ...currentDay,
-          [shiftKey]: !currentDay[shiftKey],
-        },
-      };
-    });
+    setAvailability((prev) => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [shiftKey]: !prev[day]?.[shiftKey]
+      }
+    }));
   };
 
   const updateCustomTime = (day, field, value) => {
@@ -116,7 +119,7 @@ const App = () => {
       ...prev,
       [day]: {
         ...prev[day],
-        shiftType: prev[day]?.shiftType === shiftType ? "" : shiftType // Toggle if same value
+        shiftType: prev[day]?.shiftType === shiftType ? "" : shiftType
       }
     }));
   };
@@ -475,8 +478,8 @@ const App = () => {
 
     const newEmployee = {
       name: name.trim(),
-      availability: JSON.parse(JSON.stringify(availability)),
-      customTimes: JSON.parse(JSON.stringify(customTimes)),
+      availability: { ...availability },
+      customTimes: { ...customTimes },
       roles: { ...roles },
       hourGoal: parseInt(hourGoal),
     };
@@ -506,9 +509,9 @@ const App = () => {
   const editEmployee = (index) => {
     const emp = employees[index];
     setName(emp.name);
-    setAvailability(emp.availability);
-    setCustomTimes(emp.customTimes || {});
-    setRoles(emp.roles);
+    setAvailability({ ...emp.availability });
+    setCustomTimes({ ...emp.customTimes });
+    setRoles({ ...emp.roles });
     setHourGoal(emp.hourGoal);
     setEditingIndex(index);
   };
