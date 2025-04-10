@@ -43,21 +43,9 @@ const App = () => {
     const defaultRequirements = {};
     days.forEach(day => {
       defaultRequirements[day] = {
-        manager: {
-          Opening: 1,
-          Midshift: 1,
-          Closing: 1
-        },
-        driver: {
-          Opening: 1,
-          Midshift: 1,
-          Closing: 1
-        },
-        insider: {
-          Opening: 1,
-          Midshift: 1,
-          Closing: 1
-        }
+        Opening: { manager: 1, driver: 1, insider: 1 },
+        Midshift: { manager: 1, driver: 1, insider: 1 },
+        Closing: { manager: 1, driver: 1, insider: 1 }
       };
     });
     return defaultRequirements;
@@ -565,9 +553,9 @@ const App = () => {
       ...prev,
       [day]: {
         ...prev[day],
-        [role]: {
-          ...prev[day][role],
-          [shift]: value
+        [shift]: {
+          ...prev[day][shift],
+          [role]: value
         }
       }
     }));
