@@ -42,8 +42,20 @@ const App = () => {
     };
   });
   const [schedule, setSchedule] = useState(() => {
-    const saved = localStorage.getItem("schedule");
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem("schedule");
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      // Ensure the parsed schedule has the correct structure
+      const validSchedule = {};
+      days.forEach(day => {
+        validSchedule[day] = parsed[day] || {};
+      });
+      return validSchedule;
+    } catch (error) {
+      console.error("Error loading schedule from localStorage:", error);
+      return {};
+    }
   });
   const [editingIndex, setEditingIndex] = useState(null);
   const [debugLog, setDebugLog] = useState([]);
@@ -93,7 +105,11 @@ const App = () => {
 
   // Save schedule when it changes
   useEffect(() => {
-    localStorage.setItem("schedule", JSON.stringify(schedule));
+    try {
+      localStorage.setItem("schedule", JSON.stringify(schedule));
+    } catch (error) {
+      console.error("Error saving schedule to localStorage:", error);
+    }
   }, [schedule]);
 
   const toggleAvailability = (day, shiftKey) => {
