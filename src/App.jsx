@@ -34,15 +34,33 @@ const App = () => {
   const [debugLog, setDebugLog] = useState([]);
   const [showDebug, setShowDebug] = useState(false);
   const [roleRequirements, setRoleRequirements] = useState(() => {
-    const saved = localStorage.getItem("roleRequirements");
-    return saved ? JSON.parse(saved) : days.reduce((acc, day) => {
-      acc[day] = {
-        manager: { Opening: 1, Midshift: 1, Closing: 1 },
-        driver: { Opening: 1, Midshift: 1, Closing: 1 },
-        insider: { Opening: 1, Midshift: 1, Closing: 1 }
+    const saved = localStorage.getItem('roleRequirements');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    
+    // Default requirements
+    const defaultRequirements = {};
+    days.forEach(day => {
+      defaultRequirements[day] = {
+        manager: {
+          Opening: 1,
+          Midshift: 1,
+          Closing: 1
+        },
+        driver: {
+          Opening: 1,
+          Midshift: 1,
+          Closing: 1
+        },
+        insider: {
+          Opening: 1,
+          Midshift: 1,
+          Closing: 1
+        }
       };
-      return acc;
-    }, {});
+    });
+    return defaultRequirements;
   });
 
   // Load dark mode preference
@@ -82,9 +100,9 @@ const App = () => {
     return () => clearInterval(refreshInterval);
   }, [employees]);
 
-  // Save role requirements when they change
+  // Save role requirements to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem("roleRequirements", JSON.stringify(roleRequirements));
+    localStorage.setItem('roleRequirements', JSON.stringify(roleRequirements));
   }, [roleRequirements]);
 
   const toggleAvailability = (day, shiftKey) => {
@@ -574,6 +592,20 @@ const App = () => {
     return total;
   };
 
+  // Update role requirement
+  const updateRoleRequirement = (day, role, shift, value) => {
+    setRoleRequirements(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [role]: {
+          ...prev[day][role],
+          [shift]: value
+        }
+      }
+    }));
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto dark:bg-gray-900 dark:text-white">
       <h1 className="text-2xl font-bold mb-4">Smart Shift Scheduler</h1>
@@ -723,37 +755,87 @@ const App = () => {
       {/* Role Requirements Form */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-6">
         <h2 className="text-lg font-bold mb-4">Daily Role Requirements</h2>
-        <div className="grid grid-cols-7 gap-4">
+        <div className="grid grid-cols-8 gap-4">
+          <div className="font-bold">Day</div>
+          <div className="font-bold">Opening</div>
+          <div className="font-bold">Midshift</div>
+          <div className="font-bold">Closing</div>
+          <div className="font-bold">Opening</div>
+          <div className="font-bold">Midshift</div>
+          <div className="font-bold">Closing</div>
+          <div className="font-bold">Opening</div>
+          <div className="font-bold">Midshift</div>
+          <div className="font-bold">Closing</div>
           {days.map(day => (
-            <div key={day} className="border p-4 rounded">
-              <h3 className="font-bold mb-2">{day}</h3>
-              {["manager", "driver", "insider"].map(role => (
-                <div key={role} className="mb-4">
-                  <h4 className="font-semibold capitalize mb-1">{role}s</h4>
-                  {Object.keys(shifts).map(shift => (
-                    <div key={shift} className="flex items-center gap-2 mb-1">
-                      <label className="text-sm">{shift}:</label>
-                      <input
-                        type="number"
-                        value={roleRequirements[day][role][shift]}
-                        onChange={(e) => setRoleRequirements(prev => ({
-                          ...prev,
-                          [day]: {
-                            ...prev[day],
-                            [role]: {
-                              ...prev[day][role],
-                              [shift]: Math.max(0, parseInt(e.target.value) || 0)
-                            }
-                          }
-                        }))}
-                        className="w-8 border p-1 rounded text-black"
-                        min="0"
-                      />
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+            <React.Fragment key={day}>
+              <div className="font-bold">{day}</div>
+              {/* Manager Requirements */}
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].manager.Opening}
+                onChange={(e) => updateRoleRequirement(day, 'manager', 'Opening', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].manager.Midshift}
+                onChange={(e) => updateRoleRequirement(day, 'manager', 'Midshift', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].manager.Closing}
+                onChange={(e) => updateRoleRequirement(day, 'manager', 'Closing', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              {/* Driver Requirements */}
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].driver.Opening}
+                onChange={(e) => updateRoleRequirement(day, 'driver', 'Opening', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].driver.Midshift}
+                onChange={(e) => updateRoleRequirement(day, 'driver', 'Midshift', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].driver.Closing}
+                onChange={(e) => updateRoleRequirement(day, 'driver', 'Closing', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              {/* Insider Requirements */}
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].insider.Opening}
+                onChange={(e) => updateRoleRequirement(day, 'insider', 'Opening', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].insider.Midshift}
+                onChange={(e) => updateRoleRequirement(day, 'insider', 'Midshift', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+              <input
+                type="number"
+                min="0"
+                value={roleRequirements[day].insider.Closing}
+                onChange={(e) => updateRoleRequirement(day, 'insider', 'Closing', parseInt(e.target.value))}
+                className="border p-1 w-16"
+              />
+            </React.Fragment>
           ))}
         </div>
       </div>
@@ -852,6 +934,52 @@ const App = () => {
                         </div>
                       </span>
                     )}
+                  </td>
+                );
+              })}
+              <td className="border p-2" colSpan="2"></td>
+            </tr>
+
+            {/* Shift Count Rows */}
+            <tr>
+              <td className="border p-2 font-bold">Openers</td>
+              {days.map((day) => {
+                const openerCount = Object.entries(schedule[day] || {})
+                  .filter(([shift]) => shift === "Opening")
+                  .filter(([_, emp]) => emp !== null).length;
+                return (
+                  <td key={day} className="border p-2 text-center">
+                    {openerCount}
+                  </td>
+                );
+              })}
+              <td className="border p-2" colSpan="2"></td>
+            </tr>
+
+            <tr>
+              <td className="border p-2 font-bold">Midshift</td>
+              {days.map((day) => {
+                const midshiftCount = Object.entries(schedule[day] || {})
+                  .filter(([shift]) => shift === "Midshift")
+                  .filter(([_, emp]) => emp !== null).length;
+                return (
+                  <td key={day} className="border p-2 text-center">
+                    {midshiftCount}
+                  </td>
+                );
+              })}
+              <td className="border p-2" colSpan="2"></td>
+            </tr>
+
+            <tr>
+              <td className="border p-2 font-bold">Closers</td>
+              {days.map((day) => {
+                const closerCount = Object.entries(schedule[day] || {})
+                  .filter(([shift]) => shift === "Closing")
+                  .filter(([_, emp]) => emp !== null).length;
+                return (
+                  <td key={day} className="border p-2 text-center">
+                    {closerCount}
                   </td>
                 );
               })}
