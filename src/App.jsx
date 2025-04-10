@@ -196,7 +196,7 @@ const App = () => {
       debugLog.push(`\nProcessing ${day}:`);
       
       // For each shift
-      ['opening', 'midshift', 'closing'].forEach(shift => {
+      ['Opening', 'Midshift', 'Closing'].forEach(shift => {
         const shiftKey = `${day}-${shift}`;
         newSchedule[day][shiftKey] = [];
         
