@@ -142,12 +142,12 @@ const App = () => {
     }, 0);
   };
 
-  const getDailyTotalHours = (day) => {
+  const getDailyTotalHours = (day, currentSchedule = schedule) => {
     let total = 0;
     logDebug(`\nCalculating daily total for ${day}:`);
     
     // Add regular shift hours
-    for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
+    for (const [shiftKey, emp] of Object.entries(currentSchedule[day] || {})) {
       if (emp) {
         total += shiftDurations[shiftKey];
         logDebug(`- ${emp.name} working ${shiftKey} (${shiftDurations[shiftKey]} hours)`);
@@ -278,7 +278,7 @@ const App = () => {
         continue;
       }
 
-      const currentDailyTotal = getDailyTotalHours(day);
+      const currentDailyTotal = getDailyTotalHours(day, newSchedule);
       const dailyMin = dailyGoal - 8;
       const dailyMax = dailyGoal + 8;
 
