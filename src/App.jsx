@@ -40,6 +40,8 @@ const App = () => {
   });
   const [schedule, setSchedule] = useState({});
   const [editingIndex, setEditingIndex] = useState(null);
+  const [debugLog, setDebugLog] = useState([]);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("employeeData");
@@ -137,7 +139,13 @@ const App = () => {
     return total;
   };
 
+  const logDebug = (message) => {
+    setDebugLog(prev => [...prev, message]);
+  };
+
   const generateSchedule = (empList = employees) => {
+    setDebugLog([]); // Clear debug log
+    logDebug("Starting schedule generation");
     const hoursScheduled = {};
     const newSchedule = {};
 
@@ -154,15 +162,19 @@ const App = () => {
           if (diff > 0) customHours[emp.name] += diff;
         }
       }
+      logDebug(`${emp.name} has ${customHours[emp.name]} custom hours`);
     });
 
     for (const day of days) {
+      logDebug(`\nProcessing ${day} (Goal: ${dailyHourGoals[day]} hours)`);
       newSchedule[day] = {};
       const dailyGoal = dailyHourGoals[day];
       const dailyMin = dailyGoal - 8;
       const dailyMax = dailyGoal + 8;
 
       for (const shiftKey of Object.keys(shifts)) {
+        logDebug(`\nProcessing ${shiftKey} shift`);
+        
         // First try to find employees who haven't met their goal
         let available = empList.filter((e) => {
           const scheduled = hoursScheduled[e.name] || 0;
@@ -170,21 +182,35 @@ const App = () => {
           const total = scheduled + custom;
           const goal = e.hourGoal === 999 ? 40 : e.hourGoal;
           
+          logDebug(`${e.name}: Scheduled=${scheduled}, Custom=${custom}, Total=${total}, Goal=${goal}`);
+          
           // If they're at or over their goal, don't consider them yet
-          if (total >= goal) return false;
+          if (total >= goal) {
+            logDebug(`${e.name} is at/over goal (${total} >= ${goal}), skipping`);
+            return false;
+          }
 
           // Check availability
           const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
           if (hasCustomTime) {
-            return e.customTimes[day].shiftType === shiftKey;
+            const matchesShift = e.customTimes[day].shiftType === shiftKey;
+            logDebug(`${e.name} has custom time: ${matchesShift ? 'matches shift' : 'does not match shift'}`);
+            return matchesShift;
           }
-          return e.availability?.[day]?.[shiftKey];
+          const isAvailable = e.availability?.[day]?.[shiftKey];
+          logDebug(`${e.name} regular availability: ${isAvailable ? 'available' : 'not available'}`);
+          return isAvailable;
         });
+
+        logDebug(`Available employees who haven't met their goal: ${available.map(e => e.name).join(', ')}`);
 
         // If no one available who hasn't met their goal, check if we need more hours
         if (available.length === 0) {
           const currentDailyTotal = getDailyTotalHours(day);
+          logDebug(`No available employees who haven't met their goal. Current daily total: ${currentDailyTotal}, Min needed: ${dailyMin}`);
+          
           if (currentDailyTotal < dailyMin) {
+            logDebug(`Need more hours (${currentDailyTotal} < ${dailyMin}), considering all available employees`);
             // We need more hours, consider everyone
             available = empList.filter((e) => {
               const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
@@ -193,17 +219,20 @@ const App = () => {
               }
               return e.availability?.[day]?.[shiftKey];
             });
+            logDebug(`All available employees: ${available.map(e => e.name).join(', ')}`);
           }
         }
 
         // If we have enough hours for the day, don't schedule more
         const currentDailyTotal = getDailyTotalHours(day);
         if (currentDailyTotal >= dailyMax) {
+          logDebug(`Daily total (${currentDailyTotal}) >= max (${dailyMax}), skipping shift`);
           newSchedule[day][shiftKey] = null;
           continue;
         }
 
         if (available.length === 0) {
+          logDebug(`No available employees for ${shiftKey} shift`);
           newSchedule[day][shiftKey] = null;
           continue;
         }
@@ -217,6 +246,7 @@ const App = () => {
             const goalB = b.hourGoal === 999 ? 40 : b.hourGoal;
             const distanceFromGoalA = Math.abs(hoursA - goalA);
             const distanceFromGoalB = Math.abs(hoursB - goalB);
+            logDebug(`Sorting: ${a.name} (${hoursA}/${goalA}) vs ${b.name} (${hoursB}/${goalB})`);
             return distanceFromGoalB - distanceFromGoalA;
           });
 
@@ -226,9 +256,11 @@ const App = () => {
 
         const picked = sorted.find((e) => !alreadyAssigned.has(e.name));
         if (picked) {
+          logDebug(`Selected ${picked.name} for ${shiftKey} shift`);
           newSchedule[day][shiftKey] = picked;
           hoursScheduled[picked.name] = (hoursScheduled[picked.name] || 0) + shiftDurations[shiftKey];
         } else {
+          logDebug(`No available employee found for ${shiftKey} shift`);
           newSchedule[day][shiftKey] = null;
         }
       }
@@ -669,6 +701,36 @@ const App = () => {
           Clear All
         </button>
       </div>
+
+      {/* Add Debug Button */}
+      <div className="fixed bottom-4 right-4">
+        <button
+          className="bg-gray-600 text-white px-4 py-2 rounded"
+          onClick={() => setShowDebug(true)}
+        >
+          Show Debug Log
+        </button>
+      </div>
+
+      {/* Debug Popup */}
+      {showDebug && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg max-w-4xl max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Debug Log</h2>
+              <button
+                className="text-gray-500 hover:text-gray-700"
+                onClick={() => setShowDebug(false)}
+              >
+                Close
+              </button>
+            </div>
+            <pre className="whitespace-pre-wrap font-mono text-sm">
+              {debugLog.join('\n')}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
