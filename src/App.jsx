@@ -26,6 +26,7 @@ const App = () => {
   const [employees, setEmployees] = useState([]);
   const [name, setName] = useState("");
   const [availability, setAvailability] = useState({});
+  const [customTimes, setCustomTimes] = useState({});
   const [roles, setRoles] = useState({ manager: false, insider: false, driver: false });
   const [hourGoal, setHourGoal] = useState(40);
   const [schedule, setSchedule] = useState({});
@@ -65,6 +66,16 @@ const App = () => {
         },
       };
     });
+  };
+
+  const updateCustomTime = (day, field, value) => {
+    setCustomTimes(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: value
+      }
+    }));
   };
 
   const countAvailableShifts = (employee) => {
@@ -140,6 +151,14 @@ const App = () => {
           total += shiftDurations[shiftKey];
         }
       }
+      // Add custom time hours if they exist
+      const customTime = customTimes[day];
+      if (customTime?.start && customTime?.end) {
+        const start = new Date(`2000-01-01T${customTime.start}`);
+        const end = new Date(`2000-01-01T${customTime.end}`);
+        const diff = (end - start) / (1000 * 60 * 60); // Convert to hours
+        if (diff > 0) total += diff;
+      }
     }
     return total;
   };
@@ -150,6 +169,7 @@ const App = () => {
     const newEmployee = {
       name: name.trim(),
       availability: JSON.parse(JSON.stringify(availability)),
+      customTimes: JSON.parse(JSON.stringify(customTimes)),
       roles: { ...roles },
       hourGoal: parseInt(hourGoal),
     };
@@ -164,6 +184,7 @@ const App = () => {
     setEmployees(updatedList);
     setName("");
     setAvailability({});
+    setCustomTimes({});
     setRoles({ manager: false, insider: false, driver: false });
     setHourGoal(40);
     setEditingIndex(null);
@@ -179,6 +200,7 @@ const App = () => {
     const emp = employees[index];
     setName(emp.name);
     setAvailability(emp.availability);
+    setCustomTimes(emp.customTimes || {});
     setRoles(emp.roles);
     setHourGoal(emp.hourGoal);
     setEditingIndex(index);
@@ -265,18 +287,53 @@ const App = () => {
           <strong>Availability:</strong>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-2">
             {days.map((day) => (
-              <div key={day}>
-                <div className="font-semibold">{day}</div>
-                {Object.keys(shifts).map((shiftKey) => (
-                  <label key={shiftKey} className="flex items-center gap-2">
+              <div key={day} className="border p-2 rounded">
+                <div className="font-semibold mb-2">{day}</div>
+                {Object.entries(shifts).map(([shiftKey, time]) => (
+                  <div key={shiftKey} className="mb-1">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={availability[day]?.[shiftKey] || false}
+                        onChange={() => toggleAvailability(day, shiftKey)}
+                      />
+                      {shiftKey}
+                    </label>
+                    <div className="text-sm text-gray-500 ml-5">({time})</div>
+                  </div>
+                ))}
+                <div className="mt-2 pt-2 border-t">
+                  <div className="flex items-center gap-2 mb-1">
                     <input
                       type="checkbox"
-                      checked={availability[day]?.[shiftKey] || false}
-                      onChange={() => toggleAvailability(day, shiftKey)}
+                      checked={!!customTimes[day]?.start}
+                      onChange={(e) => {
+                        if (!e.target.checked) {
+                          updateCustomTime(day, "start", "");
+                          updateCustomTime(day, "end", "");
+                        }
+                      }}
                     />
-                    {shiftKey} <span className="text-sm text-gray-500">({shifts[shiftKey]})</span>
-                  </label>
-                ))}
+                    <span className="font-medium">Custom</span>
+                  </div>
+                  {customTimes[day]?.start && (
+                    <div className="flex gap-2 ml-5">
+                      <input
+                        type="time"
+                        value={customTimes[day]?.start || ""}
+                        onChange={(e) => updateCustomTime(day, "start", e.target.value)}
+                        className="border p-1 text-black"
+                      />
+                      <span>to</span>
+                      <input
+                        type="time"
+                        value={customTimes[day]?.end || ""}
+                        onChange={(e) => updateCustomTime(day, "end", e.target.value)}
+                        className="border p-1 text-black"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
