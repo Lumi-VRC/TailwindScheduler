@@ -29,6 +29,15 @@ const App = () => {
   const [customTimes, setCustomTimes] = useState({});
   const [roles, setRoles] = useState({ manager: false, insider: false, driver: false });
   const [hourGoal, setHourGoal] = useState(40);
+  const [dailyHourGoals, setDailyHourGoals] = useState({
+    Monday: 40,
+    Tuesday: 40,
+    Wednesday: 40,
+    Thursday: 40,
+    Friday: 40,
+    Saturday: 40,
+    Sunday: 40
+  });
   const [schedule, setSchedule] = useState({});
   const [editingIndex, setEditingIndex] = useState(null);
 
@@ -128,15 +137,47 @@ const App = () => {
       }
     });
 
+    // Calculate current daily hours
+    const currentDailyHours = {};
+    days.forEach(day => {
+      currentDailyHours[day] = 0;
+      for (const shiftKey of Object.keys(shifts)) {
+        const emp = newSchedule[day]?.[shiftKey];
+        if (emp) {
+          currentDailyHours[day] += shiftDurations[shiftKey];
+        }
+      }
+    });
+
     for (const day of days) {
       newSchedule[day] = {};
 
       for (const shiftKey of Object.keys(shifts)) {
         const available = empList.filter((e) => {
-          // First check if they're already at or over their goal with custom times
+          // Calculate total hours (scheduled + custom)
+          const scheduled = hoursScheduled[e.name] || 0;
+          const custom = customHours[e.name] || 0;
+          const total = scheduled + custom;
+          
+          // Check if total hours are at or over goal
           const goal = e.hourGoal === 999 ? 40 : e.hourGoal;
           const upperBound = e.hourGoal === 999 ? 999 : goal + 8;
-          if (customHours[e.name] >= upperBound) return false;
+          
+          // If daily hours are below goal, allow exceeding employee goals
+          const dailyGoal = dailyHourGoals[day];
+          const dailyUpperBound = dailyGoal + 8;
+          const dailyLowerBound = dailyGoal - 8;
+          
+          if (currentDailyHours[day] < dailyLowerBound) {
+            // If daily hours are below lower bound, allow scheduling even if over employee goal
+            return scheduled + custom + shiftDurations[shiftKey] <= upperBound;
+          } else if (currentDailyHours[day] >= dailyUpperBound) {
+            // If daily hours are above upper bound, don't schedule anyone
+            return false;
+          } else {
+            // Otherwise, respect employee goals
+            return total < goal;
+          }
 
           // Then check if they have a custom time for this day
           const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
@@ -190,6 +231,7 @@ const App = () => {
         if (picked) {
           newSchedule[day][shiftKey] = picked;
           hoursScheduled[picked.name] = (hoursScheduled[picked.name] || 0) + shiftDurations[shiftKey];
+          currentDailyHours[day] += shiftDurations[shiftKey];
         } else {
           newSchedule[day][shiftKey] = null;
         }
@@ -474,6 +516,28 @@ const App = () => {
         >
           {editingIndex !== null ? "Update Employee" : "Add Employee"}
         </button>
+      </div>
+
+      {/* Daily Hour Goals */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-6">
+        <h2 className="text-lg font-semibold mb-4">Daily Hour Goals</h2>
+        <div className="grid grid-cols-7 gap-4">
+          {days.map((day) => (
+            <div key={day} className="flex flex-col">
+              <label className="text-sm font-medium mb-1">{day}</label>
+              <input
+                type="number"
+                min="0"
+                value={dailyHourGoals[day]}
+                onChange={(e) => setDailyHourGoals(prev => ({
+                  ...prev,
+                  [day]: parseInt(e.target.value) || 0
+                }))}
+                className="border p-2 rounded text-black"
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Schedule Grid */}
