@@ -223,8 +223,22 @@ const App = () => {
             const availableEmployees = employees.filter(emp => 
               emp.roles[role] && 
               emp.availability[currentDay]?.[shift] &&
-              !newSchedule[currentDay][shiftKey]?.includes(emp.name)
+              !newSchedule[currentDay][shiftKey]?.includes(emp.name) &&
+              !Object.values(newSchedule[currentDay]).some(shifts => 
+                shifts.includes(emp.name)
+              )
             );
+
+            // Sort available employees by how close they are to their goal
+            availableEmployees.sort((a, b) => {
+              const aHours = Object.values(employeeHours).reduce((total, dayHours) => 
+                total + (dayHours[a.name] || 0), 0
+              );
+              const bHours = Object.values(employeeHours).reduce((total, dayHours) => 
+                total + (dayHours[b.name] || 0), 0
+              );
+              return aHours - bHours; // Prioritize employees with fewer hours
+            });
 
             // Assign employees to meet role requirements
             for (const emp of availableEmployees) {
@@ -243,48 +257,50 @@ const App = () => {
       });
     });
 
-    // Second pass: Balance hour goals
+    // Second pass: Fill any remaining unfilled slots
     days.forEach(day => {
       const shifts = ['opening', 'midshift', 'closing'];
       
       shifts.forEach(shift => {
         const shiftKey = `${day}-${shift}`;
-        const currentEmployees = newSchedule[day][shiftKey] || [];
+        const roles = ['manager', 'driver', 'insider'];
         
-        currentEmployees.forEach(empName => {
-          const emp = employees.find(e => e.name === empName);
-          const totalHours = Object.values(employeeHours).reduce((total, dayHours) => 
-            total + (dayHours[empName] || 0), 0
-          );
+        roles.forEach(role => {
+          const requiredCount = roleRequirements[day][role][shift];
+          const currentCount = newSchedule[day][shiftKey]?.length || 0;
           
-          // If employee is over their goal, try to find a replacement
-          if (totalHours > emp.hourGoal) {
-            // Find available employees who are under their goal
-            const potentialReplacements = employees.filter(replacement => 
-              replacement.roles[emp.roles] && // Can fill the same role
-              replacement.availability[day]?.[shift] && // Available for this shift
-              !newSchedule[day][shiftKey]?.includes(replacement.name) && // Not already working this shift
-              !Object.values(newSchedule[day]).some(shifts => // Not working any other shift this day
-                shifts.includes(replacement.name)
+          if (currentCount < requiredCount) {
+            // Get any available employee who can fill this role
+            const availableEmployees = employees.filter(emp => 
+              emp.roles[role] && 
+              emp.availability[day]?.[shift] &&
+              !newSchedule[day][shiftKey]?.includes(emp.name) &&
+              !Object.values(newSchedule[day]).some(shifts => 
+                shifts.includes(emp.name)
               )
-            ).filter(replacement => {
-              // Calculate their current hours
-              const replacementHours = Object.values(employeeHours).reduce((total, dayHours) => 
-                total + (dayHours[replacement.name] || 0), 0
+            );
+
+            // Sort by total hours to prioritize those with fewer hours
+            availableEmployees.sort((a, b) => {
+              const aHours = Object.values(employeeHours).reduce((total, dayHours) => 
+                total + (dayHours[a.name] || 0), 0
               );
-              return replacementHours < replacement.hourGoal;
+              const bHours = Object.values(employeeHours).reduce((total, dayHours) => 
+                total + (dayHours[b.name] || 0), 0
+              );
+              return aHours - bHours;
             });
-            
-            // If we found a replacement, make the swap
-            if (potentialReplacements.length > 0) {
-              // Remove current employee
-              newSchedule[day][shiftKey] = newSchedule[day][shiftKey].filter(name => name !== empName);
-              employeeHours[day][empName] -= shiftDurations[shiftKey];
+
+            // Assign remaining employees
+            for (const emp of availableEmployees) {
+              if (currentCount >= requiredCount) break;
               
-              // Add replacement
-              newSchedule[day][shiftKey].push(potentialReplacements[0].name);
-              employeeHours[day][potentialReplacements[0].name] = 
-                (employeeHours[day][potentialReplacements[0].name] || 0) + shiftDurations[shiftKey];
+              if (!newSchedule[day][shiftKey]) {
+                newSchedule[day][shiftKey] = [];
+              }
+              
+              newSchedule[day][shiftKey].push(emp.name);
+              employeeHours[day][emp.name] = (employeeHours[day][emp.name] || 0) + shiftDurations[shiftKey];
             }
           }
         });
