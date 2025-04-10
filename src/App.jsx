@@ -788,7 +788,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].manager.Opening}
                       onChange={(e) => updateRoleRequirement(day, 'manager', 'Opening', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   <td className="border p-2">
@@ -797,7 +797,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].manager.Midshift}
                       onChange={(e) => updateRoleRequirement(day, 'manager', 'Midshift', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   <td className="border p-2">
@@ -806,7 +806,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].manager.Closing}
                       onChange={(e) => updateRoleRequirement(day, 'manager', 'Closing', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   {/* Driver Requirements */}
@@ -816,7 +816,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].driver.Opening}
                       onChange={(e) => updateRoleRequirement(day, 'driver', 'Opening', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   <td className="border p-2">
@@ -825,7 +825,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].driver.Midshift}
                       onChange={(e) => updateRoleRequirement(day, 'driver', 'Midshift', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   <td className="border p-2">
@@ -834,7 +834,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].driver.Closing}
                       onChange={(e) => updateRoleRequirement(day, 'driver', 'Closing', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   {/* Insider Requirements */}
@@ -844,7 +844,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].insider.Opening}
                       onChange={(e) => updateRoleRequirement(day, 'insider', 'Opening', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   <td className="border p-2">
@@ -853,7 +853,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].insider.Midshift}
                       onChange={(e) => updateRoleRequirement(day, 'insider', 'Midshift', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                   <td className="border p-2">
@@ -862,7 +862,7 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].insider.Closing}
                       onChange={(e) => updateRoleRequirement(day, 'insider', 'Closing', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center"
+                      className="w-16 border p-1 text-center text-black"
                     />
                   </td>
                 </tr>
