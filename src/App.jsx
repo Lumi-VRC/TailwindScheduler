@@ -196,6 +196,13 @@ const App = () => {
           }
         }
 
+        // If we have enough hours for the day, don't schedule more
+        const currentDailyTotal = getDailyTotalHours(day);
+        if (currentDailyTotal >= dailyMax) {
+          newSchedule[day][shiftKey] = null;
+          continue;
+        }
+
         if (available.length === 0) {
           newSchedule[day][shiftKey] = null;
           continue;
