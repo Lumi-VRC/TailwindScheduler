@@ -77,21 +77,33 @@ const App = () => {
     localStorage.setItem("darkMode", isDark.toString());
   };
 
+  // Load employee data from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("employeeData");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setEmployees(parsed);
-      generateSchedule(parsed);
+    try {
+      const saved = localStorage.getItem("employeeData");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setEmployees(parsed);
+        generateSchedule(parsed);
+      }
+    } catch (error) {
+      console.error("Error loading employee data:", error);
+      // Clear corrupted data
+      localStorage.removeItem("employeeData");
     }
   }, []);
 
+  // Save employee data and update schedule
   useEffect(() => {
-    localStorage.setItem("employeeData", JSON.stringify(employees));
-    generateSchedule(employees);
+    try {
+      localStorage.setItem("employeeData", JSON.stringify(employees));
+      generateSchedule(employees);
+    } catch (error) {
+      console.error("Error saving employee data:", error);
+    }
   }, [employees]);
 
-  // Add auto-refresh effect
+  // Add auto-refresh effect with cleanup
   useEffect(() => {
     const refreshInterval = setInterval(() => {
       generateSchedule(employees);
@@ -100,9 +112,13 @@ const App = () => {
     return () => clearInterval(refreshInterval);
   }, [employees]);
 
-  // Save role requirements to localStorage whenever they change
+  // Save role requirements to localStorage
   useEffect(() => {
-    localStorage.setItem('roleRequirements', JSON.stringify(roleRequirements));
+    try {
+      localStorage.setItem('roleRequirements', JSON.stringify(roleRequirements));
+    } catch (error) {
+      console.error("Error saving role requirements:", error);
+    }
   }, [roleRequirements]);
 
   const toggleAvailability = (day, shiftKey) => {
@@ -235,13 +251,13 @@ const App = () => {
       // For each shift
       ['Opening', 'Midshift', 'Closing'].forEach(shift => {
         const shiftKey = `${day}-${shift}`;
-        newSchedule[day][shiftKey] = null; // Initialize as null instead of array
+        newSchedule[day][shiftKey] = null;
         
         // Get role requirements for this shift
         const requiredRoles = {
-          manager: roleRequirements[day].manager[shift],
-          driver: roleRequirements[day].driver[shift],
-          insider: roleRequirements[day].insider[shift]
+          manager: roleRequirements[day]?.manager?.[shift] || 0,
+          driver: roleRequirements[day]?.driver?.[shift] || 0,
+          insider: roleRequirements[day]?.insider?.[shift] || 0
         };
         
         debugLog.push(`\n${shift} shift requirements:`);
@@ -252,7 +268,7 @@ const App = () => {
         // For each employee
         for (const emp of employees) {
           // Check if employee is available for this shift
-          if (emp.availability[day]?.[shift]) {
+          if (emp.availability?.[day]?.[shift]) {
             // Check if we still need this role
             if (emp.roles.manager && requiredRoles.manager > 0) {
               newSchedule[day][shiftKey] = {
@@ -264,7 +280,7 @@ const App = () => {
               };
               requiredRoles.manager--;
               debugLog.push(`  Assigned ${emp.name} as manager`);
-              break; // Stop after assigning one employee
+              break;
             }
             else if (emp.roles.driver && requiredRoles.driver > 0) {
               newSchedule[day][shiftKey] = {
@@ -276,7 +292,7 @@ const App = () => {
               };
               requiredRoles.driver--;
               debugLog.push(`  Assigned ${emp.name} as driver`);
-              break; // Stop after assigning one employee
+              break;
             }
             else if (emp.roles.insider && requiredRoles.insider > 0) {
               newSchedule[day][shiftKey] = {
@@ -288,7 +304,7 @@ const App = () => {
               };
               requiredRoles.insider--;
               debugLog.push(`  Assigned ${emp.name} as insider`);
-              break; // Stop after assigning one employee
+              break;
             }
           }
         }
@@ -755,7 +771,7 @@ const App = () => {
                       <td className="border p-2">{emp.name}</td>
                       {days.map((day) => {
                         const assignedShift = Object.entries(schedule[day] || {}).find(
-                          ([, val]) => val?.name === emp.name
+                          ([shiftKey, val]) => val?.name === emp.name
                         );
                         const customTime = emp.customTimes?.[day];
                         const shiftType = customTime?.shiftType;
@@ -765,13 +781,13 @@ const App = () => {
                           <td 
                             key={day} 
                             className={`border p-2 text-sm text-center relative group ${
-                              assignedShift ? shiftColors[assignedShift[0]] : 
+                              assignedShift ? shiftColors[assignedShift[0].split('-')[1]] : 
                               customTime?.start && customTime?.end ? shiftColors[shiftType] : ""
                             }`}
                           >
-                            {assignedShift ? shifts[assignedShift[0]] : customTimeDisplay}
+                            {assignedShift ? shifts[assignedShift[0].split('-')[1]] : customTimeDisplay}
                             <div className="absolute hidden group-hover:block z-10 w-48 p-2 bg-white text-black text-xs rounded shadow-lg">
-                              Available: {getAvailableEmployees(day, assignedShift?.[0] || Object.keys(shifts)[0])}
+                              Available: {getAvailableEmployees(day, assignedShift?.[0].split('-')[1] || Object.keys(shifts)[0])}
                             </div>
                           </td>
                         );
