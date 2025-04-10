@@ -621,6 +621,24 @@ const App = () => {
               <td className="border p-2"></td>
               <td className="border p-2"></td>
             </tr>
+            {/* Add Hours Needed Row */}
+            <tr className="bg-gray-100 dark:bg-gray-700 font-bold">
+              <td className="border p-2">Hours Needed</td>
+              {days.map(day => (
+                <td key={day} className="border p-2 text-center">
+                  {dailyHourGoals[day]}
+                </td>
+              ))}
+              <td className="border p-2"></td>
+              <td className="border p-2">
+                <button
+                  className="bg-blue-600 text-white px-4 py-1 rounded"
+                  onClick={() => generateSchedule()}
+                >
+                  Update Schedule
+                </button>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
