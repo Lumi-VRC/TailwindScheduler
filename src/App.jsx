@@ -83,9 +83,24 @@ const App = () => {
       ...prev,
       [day]: {
         ...prev[day],
-        shiftType
+        shiftType: prev[day]?.shiftType === shiftType ? "" : shiftType // Toggle if same value
       }
     }));
+  };
+
+  const toggleCustomTime = (day) => {
+    setCustomTimes(prev => {
+      if (prev[day]?.start) {
+        const newTimes = { ...prev };
+        delete newTimes[day];
+        return newTimes;
+      } else {
+        return {
+          ...prev,
+          [day]: { start: "", end: "", shiftType: "" }
+        };
+      }
+    });
   };
 
   const countAvailableShifts = (employee) => {
@@ -318,17 +333,11 @@ const App = () => {
                     <input
                       type="checkbox"
                       checked={!!customTimes[day]?.start}
-                      onChange={(e) => {
-                        if (!e.target.checked) {
-                          updateCustomTime(day, "start", "");
-                          updateCustomTime(day, "end", "");
-                          updateCustomTime(day, "shiftType", "");
-                        }
-                      }}
+                      onChange={() => toggleCustomTime(day)}
                     />
                     <span className="font-medium">Custom</span>
                   </div>
-                  {customTimes[day]?.start && (
+                  {customTimes[day]?.start !== undefined && (
                     <div className="ml-5">
                       <div className="flex gap-2 mb-2">
                         <input
