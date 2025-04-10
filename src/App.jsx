@@ -775,11 +775,21 @@ const App = () => {
                       <td className="border p-2">{emp.name}</td>
                       {days.map((day) => {
                         const assignedShifts = Object.entries(schedule[day] || {}).filter(
-                          ([shiftKey, val]) => Array.isArray(val) && val.some(emp => emp.name === emp.name)
+                          ([shiftKey, val]) => Array.isArray(val) && val.some(e => e.name === emp.name)
                         );
                         const customTime = emp.customTimes?.[day];
                         const shiftType = customTime?.shiftType;
                         const customTimeDisplay = formatCustomTime(customTime?.start, customTime?.end);
+                        
+                        const shiftDisplay = assignedShifts.length > 0 ? 
+                          assignedShifts
+                            .map(([shiftKey, employees]) => 
+                              employees.filter(e => e.name === emp.name)
+                                .map(() => shifts[shiftKey.split('-')[1]])
+                            )
+                            .flat()
+                            .join(', ') : 
+                          customTimeDisplay;
                         
                         return (
                           <td 
@@ -789,14 +799,7 @@ const App = () => {
                               customTime?.start && customTime?.end ? shiftColors[shiftType] : ""
                             }`}
                           >
-                            {assignedShifts.length > 0 ? 
-                              assignedShifts.map(([shiftKey, employees]) => 
-                                employees.filter(e => e.name === emp.name)
-                                  .map(e => shifts[shiftKey.split('-')[1]])
-                                  .join(', ')
-                              ).join(', ') : 
-                              customTimeDisplay
-                            }
+                            {shiftDisplay}
                             <div className="absolute hidden group-hover:block z-10 w-48 p-2 bg-white text-black text-xs rounded shadow-lg">
                               Available: {getAvailableEmployees(day, assignedShifts[0]?.[0].split('-')[1] || Object.keys(shifts)[0])}
                             </div>
@@ -874,8 +877,8 @@ const App = () => {
               <td className="border p-2 font-bold">Openers</td>
               {days.map((day) => {
                 const openerCount = Object.entries(schedule[day] || {})
-                  .filter(([shift]) => shift === "Opening")
-                  .filter(([_, emp]) => emp !== null).length;
+                  .filter(([shift]) => shift.includes('Opening'))
+                  .reduce((total, [_, employees]) => total + (Array.isArray(employees) ? employees.length : 0), 0);
                 return (
                   <td key={day} className="border p-2 text-center">
                     {openerCount}
@@ -889,8 +892,8 @@ const App = () => {
               <td className="border p-2 font-bold">Midshift</td>
               {days.map((day) => {
                 const midshiftCount = Object.entries(schedule[day] || {})
-                  .filter(([shift]) => shift === "Midshift")
-                  .filter(([_, emp]) => emp !== null).length;
+                  .filter(([shift]) => shift.includes('Midshift'))
+                  .reduce((total, [_, employees]) => total + (Array.isArray(employees) ? employees.length : 0), 0);
                 return (
                   <td key={day} className="border p-2 text-center">
                     {midshiftCount}
@@ -904,8 +907,8 @@ const App = () => {
               <td className="border p-2 font-bold">Closers</td>
               {days.map((day) => {
                 const closerCount = Object.entries(schedule[day] || {})
-                  .filter(([shift]) => shift === "Closing")
-                  .filter(([_, emp]) => emp !== null).length;
+                  .filter(([shift]) => shift.includes('Closing'))
+                  .reduce((total, [_, employees]) => total + (Array.isArray(employees) ? employees.length : 0), 0);
                 return (
                   <td key={day} className="border p-2 text-center">
                     {closerCount}
