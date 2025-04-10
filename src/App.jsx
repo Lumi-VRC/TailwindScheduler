@@ -20,7 +20,7 @@ const shiftDurations = {
   Closing: 8,
 };
 
-const hourGoalOptions = [8, 16, 24, 32, 40, 999];
+const hourGoalOptions = [8, 16, 24, 32, 40];
 
 const App = () => {
   const [employees, setEmployees] = useState([]);
@@ -267,6 +267,13 @@ const App = () => {
 
         // For each employee
         for (const emp of employees) {
+          // Check if employee has exceeded their hour goal by 8 hours
+          const currentHours = getTotalHoursForEmployee(emp.name);
+          if (currentHours >= emp.hourGoal + 8) {
+            debugLog.push(`  ${emp.name} has exceeded hour goal by 8+ hours (${currentHours}/${emp.hourGoal})`);
+            continue;
+          }
+
           // Check if employee is available for this shift
           if (emp.availability?.[day]?.[shift]) {
             // Check if we still need this role
@@ -617,7 +624,7 @@ const App = () => {
           >
             {hourGoalOptions.map((val) => (
               <option key={val} value={val}>
-                {val === 999 ? "40+" : val + " hrs"}
+                {val + " hrs"}
               </option>
             ))}
           </select>
