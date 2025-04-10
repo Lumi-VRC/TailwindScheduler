@@ -249,7 +249,7 @@ const App = () => {
       {/* Form */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-6">
         <input
-          className="border p-2 mr-4"
+          className="border p-2 mr-4 text-black"
           value={name}
           placeholder="Employee name"
           onChange={(e) => setName(e.target.value)}
@@ -299,7 +299,7 @@ const App = () => {
           <select
             value={hourGoal}
             onChange={(e) => setHourGoal(e.target.value)}
-            className="border p-2 ml-2"
+            className="border p-2 ml-2 text-black"
           >
             {hourGoalOptions.map((val) => (
               <option key={val} value={val}>
