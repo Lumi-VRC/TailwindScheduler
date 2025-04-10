@@ -29,19 +29,41 @@ const App = () => {
   const [customTimes, setCustomTimes] = useState({});
   const [roles, setRoles] = useState({ manager: false, insider: false, driver: false });
   const [hourGoal, setHourGoal] = useState(40);
-  const [dailyHourGoals, setDailyHourGoals] = useState({
-    Monday: 40,
-    Tuesday: 40,
-    Wednesday: 40,
-    Thursday: 40,
-    Friday: 40,
-    Saturday: 40,
-    Sunday: 40
+  const [dailyHourGoals, setDailyHourGoals] = useState(() => {
+    const saved = localStorage.getItem("dailyHourGoals");
+    return saved ? JSON.parse(saved) : {
+      Monday: 40,
+      Tuesday: 40,
+      Wednesday: 40,
+      Thursday: 40,
+      Friday: 40,
+      Saturday: 40,
+      Sunday: 40
+    };
   });
   const [schedule, setSchedule] = useState({});
   const [editingIndex, setEditingIndex] = useState(null);
   const [debugLog, setDebugLog] = useState([]);
   const [showDebug, setShowDebug] = useState(false);
+
+  // Load dark mode preference
+  useEffect(() => {
+    const isDark = localStorage.getItem("darkMode") === "true";
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  // Save dark mode preference
+  const toggleDarkMode = () => {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem("darkMode", isDark.toString());
+  };
+
+  // Save daily hour goals when they change
+  useEffect(() => {
+    localStorage.setItem("dailyHourGoals", JSON.stringify(dailyHourGoals));
+  }, [dailyHourGoals]);
 
   useEffect(() => {
     const saved = localStorage.getItem("employeeData");
@@ -165,6 +187,7 @@ const App = () => {
       logDebug(`${emp.name} has ${customHours[emp.name]} custom hours`);
     });
 
+    // First pass: Assign shifts to meet employee goals
     for (const day of days) {
       logDebug(`\nProcessing ${day} (Goal: ${dailyHourGoals[day]} hours)`);
       newSchedule[day] = {};
@@ -204,33 +227,6 @@ const App = () => {
 
         logDebug(`Available employees who haven't met their goal: ${available.map(e => e.name).join(', ')}`);
 
-        // If no one available who hasn't met their goal, check if we need more hours
-        if (available.length === 0) {
-          const currentDailyTotal = getDailyTotalHours(day);
-          logDebug(`No available employees who haven't met their goal. Current daily total: ${currentDailyTotal}, Min needed: ${dailyMin}`);
-          
-          if (currentDailyTotal < dailyMin) {
-            logDebug(`Need more hours (${currentDailyTotal} < ${dailyMin}), considering all available employees`);
-            // We need more hours, consider everyone
-            available = empList.filter((e) => {
-              const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
-              if (hasCustomTime) {
-                return e.customTimes[day].shiftType === shiftKey;
-              }
-              return e.availability?.[day]?.[shiftKey];
-            });
-            logDebug(`All available employees: ${available.map(e => e.name).join(', ')}`);
-          }
-        }
-
-        // If we have enough hours for the day, don't schedule more
-        const currentDailyTotal = getDailyTotalHours(day);
-        if (currentDailyTotal >= dailyMax) {
-          logDebug(`Daily total (${currentDailyTotal}) >= max (${dailyMax}), skipping shift`);
-          newSchedule[day][shiftKey] = null;
-          continue;
-        }
-
         if (available.length === 0) {
           logDebug(`No available employees for ${shiftKey} shift`);
           newSchedule[day][shiftKey] = null;
@@ -262,6 +258,43 @@ const App = () => {
         } else {
           logDebug(`No available employee found for ${shiftKey} shift`);
           newSchedule[day][shiftKey] = null;
+        }
+      }
+    }
+
+    // Second pass: Fill remaining shifts to meet daily goals
+    for (const day of days) {
+      const dailyGoal = dailyHourGoals[day];
+      if (dailyGoal === 0) continue; // Skip days with zero goal
+
+      const currentDailyTotal = getDailyTotalHours(day);
+      if (currentDailyTotal >= dailyGoal + 8) continue; // Skip if we've met the daily goal
+
+      for (const shiftKey of Object.keys(shifts)) {
+        if (newSchedule[day][shiftKey]) continue; // Skip if shift is already filled
+
+        // Find available employees who can work this shift
+        const available = empList.filter((e) => {
+          const hasCustomTime = e.customTimes?.[day]?.start && e.customTimes?.[day]?.end;
+          if (hasCustomTime) {
+            return e.customTimes[day].shiftType === shiftKey;
+          }
+          return e.availability?.[day]?.[shiftKey];
+        });
+
+        if (available.length === 0) continue;
+
+        // Sort by total hours (prefer employees with fewer hours)
+        const sorted = available.sort((a, b) => {
+          const hoursA = (hoursScheduled[a.name] || 0) + (customHours[a.name] || 0);
+          const hoursB = (hoursScheduled[b.name] || 0) + (customHours[b.name] || 0);
+          return hoursA - hoursB;
+        });
+
+        const picked = sorted[0];
+        if (picked) {
+          newSchedule[day][shiftKey] = picked;
+          hoursScheduled[picked.name] = (hoursScheduled[picked.name] || 0) + shiftDurations[shiftKey];
         }
       }
     }
@@ -405,9 +438,7 @@ const App = () => {
       {/* Dark Mode Toggle */}
       <div className="mb-4">
         <button
-          onClick={() => {
-            document.documentElement.classList.toggle('dark');
-          }}
+          onClick={toggleDarkMode}
           className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
         >
           Toggle Dark Mode
@@ -669,14 +700,7 @@ const App = () => {
                 </td>
               ))}
               <td className="border p-2"></td>
-              <td className="border p-2">
-                <button
-                  className="bg-blue-600 text-white px-4 py-1 rounded"
-                  onClick={() => generateSchedule()}
-                >
-                  Update Schedule
-                </button>
-              </td>
+              <td className="border p-2"></td>
             </tr>
           </tbody>
         </table>
