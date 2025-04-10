@@ -78,6 +78,16 @@ const App = () => {
     }));
   };
 
+  const updateCustomShiftType = (day, shiftType) => {
+    setCustomTimes(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        shiftType
+      }
+    }));
+  };
+
   const countAvailableShifts = (employee) => {
     return Object.values(employee.availability || {}).reduce((total, shiftSet) => {
       return total + Object.values(shiftSet).filter(Boolean).length;
@@ -102,14 +112,15 @@ const App = () => {
         const sorted = available
           .filter((emp) => {
             const scheduled = hoursScheduled[emp.name] || 0;
-            const goal = emp.hourGoal || 40;
-            return scheduled + shiftDurations[shiftKey] <= goal + 8;
+            const goal = emp.hourGoal === 999 ? 40 : emp.hourGoal;
+            const upperBound = emp.hourGoal === 999 ? 999 : goal + 8;
+            return scheduled + shiftDurations[shiftKey] <= upperBound;
           })
           .sort((a, b) => {
             const hoursA = hoursScheduled[a.name] || 0;
             const hoursB = hoursScheduled[b.name] || 0;
-            const goalA = a.hourGoal || 40;
-            const goalB = b.hourGoal || 40;
+            const goalA = a.hourGoal === 999 ? 40 : a.hourGoal;
+            const goalB = b.hourGoal === 999 ? 40 : b.hourGoal;
             const flexA = countAvailableShifts(a);
             const flexB = countAvailableShifts(b);
 
@@ -311,26 +322,58 @@ const App = () => {
                         if (!e.target.checked) {
                           updateCustomTime(day, "start", "");
                           updateCustomTime(day, "end", "");
+                          updateCustomTime(day, "shiftType", "");
                         }
                       }}
                     />
                     <span className="font-medium">Custom</span>
                   </div>
                   {customTimes[day]?.start && (
-                    <div className="flex gap-2 ml-5">
-                      <input
-                        type="time"
-                        value={customTimes[day]?.start || ""}
-                        onChange={(e) => updateCustomTime(day, "start", e.target.value)}
-                        className="border p-1 text-black"
-                      />
-                      <span>to</span>
-                      <input
-                        type="time"
-                        value={customTimes[day]?.end || ""}
-                        onChange={(e) => updateCustomTime(day, "end", e.target.value)}
-                        className="border p-1 text-black"
-                      />
+                    <div className="ml-5">
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="time"
+                          value={customTimes[day]?.start || ""}
+                          onChange={(e) => updateCustomTime(day, "start", e.target.value)}
+                          className="border p-1 text-black"
+                        />
+                        <span>to</span>
+                        <input
+                          type="time"
+                          value={customTimes[day]?.end || ""}
+                          onChange={(e) => updateCustomTime(day, "end", e.target.value)}
+                          className="border p-1 text-black"
+                        />
+                      </div>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="radio"
+                            name={`shiftType-${day}`}
+                            checked={customTimes[day]?.shiftType === "Opening"}
+                            onChange={() => updateCustomShiftType(day, "Opening")}
+                          />
+                          Opening
+                        </label>
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="radio"
+                            name={`shiftType-${day}`}
+                            checked={customTimes[day]?.shiftType === "Midshift"}
+                            onChange={() => updateCustomShiftType(day, "Midshift")}
+                          />
+                          Midshift
+                        </label>
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="radio"
+                            name={`shiftType-${day}`}
+                            checked={customTimes[day]?.shiftType === "Closing"}
+                            onChange={() => updateCustomShiftType(day, "Closing")}
+                          />
+                          Closing
+                        </label>
+                      </div>
                     </div>
                   )}
                 </div>
