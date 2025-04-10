@@ -752,91 +752,123 @@ const App = () => {
         </button>
       </div>
 
-      {/* Role Requirements Form */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-6">
-        <h2 className="text-lg font-bold mb-4">Daily Role Requirements</h2>
-        <div className="grid grid-cols-8 gap-4">
-          <div className="font-bold">Day</div>
-          <div className="font-bold">Opening</div>
-          <div className="font-bold">Midshift</div>
-          <div className="font-bold">Closing</div>
-          <div className="font-bold">Opening</div>
-          <div className="font-bold">Midshift</div>
-          <div className="font-bold">Closing</div>
-          <div className="font-bold">Opening</div>
-          <div className="font-bold">Midshift</div>
-          <div className="font-bold">Closing</div>
-          {days.map(day => (
-            <React.Fragment key={day}>
-              <div className="font-bold">{day}</div>
-              {/* Manager Requirements */}
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].manager.Opening}
-                onChange={(e) => updateRoleRequirement(day, 'manager', 'Opening', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].manager.Midshift}
-                onChange={(e) => updateRoleRequirement(day, 'manager', 'Midshift', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].manager.Closing}
-                onChange={(e) => updateRoleRequirement(day, 'manager', 'Closing', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              {/* Driver Requirements */}
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].driver.Opening}
-                onChange={(e) => updateRoleRequirement(day, 'driver', 'Opening', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].driver.Midshift}
-                onChange={(e) => updateRoleRequirement(day, 'driver', 'Midshift', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].driver.Closing}
-                onChange={(e) => updateRoleRequirement(day, 'driver', 'Closing', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              {/* Insider Requirements */}
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].insider.Opening}
-                onChange={(e) => updateRoleRequirement(day, 'insider', 'Opening', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].insider.Midshift}
-                onChange={(e) => updateRoleRequirement(day, 'insider', 'Midshift', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-              <input
-                type="number"
-                min="0"
-                value={roleRequirements[day].insider.Closing}
-                onChange={(e) => updateRoleRequirement(day, 'insider', 'Closing', parseInt(e.target.value))}
-                className="border p-1 w-16"
-              />
-            </React.Fragment>
-          ))}
+      {/* Daily Role Requirements */}
+      <div className="mb-8">
+        <h2 className="text-xl font-bold mb-4">Daily Role Requirements</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border">
+            <thead>
+              <tr>
+                <th className="border p-2 font-bold">Day</th>
+                <th colSpan="3" className="border p-2 font-bold text-center">Managers</th>
+                <th colSpan="3" className="border p-2 font-bold text-center">Drivers</th>
+                <th colSpan="3" className="border p-2 font-bold text-center">Insiders</th>
+              </tr>
+              <tr>
+                <th className="border p-2"></th>
+                <th className="border p-2 font-bold">Opening</th>
+                <th className="border p-2 font-bold">Midshift</th>
+                <th className="border p-2 font-bold">Closing</th>
+                <th className="border p-2 font-bold">Opening</th>
+                <th className="border p-2 font-bold">Midshift</th>
+                <th className="border p-2 font-bold">Closing</th>
+                <th className="border p-2 font-bold">Opening</th>
+                <th className="border p-2 font-bold">Midshift</th>
+                <th className="border p-2 font-bold">Closing</th>
+              </tr>
+            </thead>
+            <tbody>
+              {days.map(day => (
+                <tr key={day}>
+                  <td className="border p-2 font-bold">{day}</td>
+                  {/* Manager Requirements */}
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].manager.Opening}
+                      onChange={(e) => updateRoleRequirement(day, 'manager', 'Opening', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].manager.Midshift}
+                      onChange={(e) => updateRoleRequirement(day, 'manager', 'Midshift', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].manager.Closing}
+                      onChange={(e) => updateRoleRequirement(day, 'manager', 'Closing', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  {/* Driver Requirements */}
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].driver.Opening}
+                      onChange={(e) => updateRoleRequirement(day, 'driver', 'Opening', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].driver.Midshift}
+                      onChange={(e) => updateRoleRequirement(day, 'driver', 'Midshift', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].driver.Closing}
+                      onChange={(e) => updateRoleRequirement(day, 'driver', 'Closing', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  {/* Insider Requirements */}
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].insider.Opening}
+                      onChange={(e) => updateRoleRequirement(day, 'insider', 'Opening', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].insider.Midshift}
+                      onChange={(e) => updateRoleRequirement(day, 'insider', 'Midshift', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={roleRequirements[day].insider.Closing}
+                      onChange={(e) => updateRoleRequirement(day, 'insider', 'Closing', parseInt(e.target.value))}
+                      className="w-16 border p-1 text-center"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
