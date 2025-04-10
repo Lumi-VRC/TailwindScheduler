@@ -962,6 +962,23 @@ const App = () => {
               <td className="border p-2" colSpan="2"></td>
             </tr>
 
+            {/* Daily Total Hours Row */}
+            <tr>
+              <td className="border p-2 font-bold">Daily Hours</td>
+              {days.map((day) => {
+                const totalHours = getDailyTotalHours(day);
+                return (
+                  <td key={day} className="border p-2 text-center">
+                    {totalHours} hrs
+                  </td>
+                );
+              })}
+              <td className="border p-2 text-center font-bold">
+                {days.reduce((total, day) => total + getDailyTotalHours(day), 0)} hrs
+              </td>
+              <td className="border p-2"></td>
+            </tr>
+
             {/* Shift Count Rows */}
             <tr>
               <td className="border p-2 font-bold">Openers</td>
