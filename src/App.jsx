@@ -171,6 +171,8 @@ const App = () => {
 
   const getScheduledHours = (empName) => {
     let total = 0;
+    const employee = employees.find(e => e.name === empName);
+    
     for (const day of days) {
       for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
         if (emp?.name === empName) {
@@ -178,7 +180,7 @@ const App = () => {
         }
       }
       // Add custom time hours if they exist
-      const customTime = customTimes[day];
+      const customTime = employee?.customTimes?.[day];
       if (customTime?.start && customTime?.end) {
         const start = new Date(`2000-01-01T${customTime.start}`);
         const end = new Date(`2000-01-01T${customTime.end}`);
