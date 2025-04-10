@@ -219,17 +219,28 @@ const App = () => {
           const custom = customHours[e.name] || 0;
           const total = scheduled + custom;
           const goal = e.hourGoal === 999 ? 40 : e.hourGoal;
+          const shiftHours = shiftDurations[shiftKey];
+          const wouldBeTotal = total + shiftHours;
           
           logDebug(`\nChecking ${e.name}:`);
           logDebug(`  Scheduled hours: ${scheduled}`);
           logDebug(`  Custom hours: ${custom}`);
-          logDebug(`  Total hours: ${total}`);
+          logDebug(`  Current total: ${total}`);
           logDebug(`  Goal hours: ${goal}`);
+          logDebug(`  This shift: ${shiftKey} (${shiftHours} hours)`);
+          logDebug(`  Would be total: ${wouldBeTotal}`);
           logDebug(`  Distance from goal: ${Math.abs(total - goal)}`);
+          logDebug(`  Would exceed goal: ${wouldBeTotal > goal}`);
           
           // If they're at or over their goal, don't consider them yet
           if (total >= goal) {
             logDebug(`  ${e.name} is at/over goal (${total} >= ${goal}), skipping`);
+            return false;
+          }
+
+          // If adding this shift would exceed their goal, don't consider them
+          if (wouldBeTotal > goal) {
+            logDebug(`  ${e.name} would exceed goal with this shift (${wouldBeTotal} > ${goal}), skipping`);
             return false;
           }
 
