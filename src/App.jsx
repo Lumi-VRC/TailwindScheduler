@@ -45,25 +45,19 @@ const App = () => {
   const [editingIndex, setEditingIndex] = useState(null);
   const [debugLog, setDebugLog] = useState([]);
   const [showDebug, setShowDebug] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem("darkMode");
-    return saved === "true";
-  });
 
   // Load dark mode preference
   useEffect(() => {
-    if (isDarkMode) {
+    const isDark = localStorage.getItem("darkMode") === "true";
+    if (isDark) {
       document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
     }
-  }, [isDarkMode]);
+  }, []);
 
   // Save dark mode preference
   const toggleDarkMode = () => {
-    const newDarkMode = !isDarkMode;
-    setIsDarkMode(newDarkMode);
-    localStorage.setItem("darkMode", newDarkMode.toString());
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem("darkMode", isDark.toString());
   };
 
   // Save daily hour goals when they change
@@ -95,13 +89,16 @@ const App = () => {
   }, [employees]);
 
   const toggleAvailability = (day, shiftKey) => {
-    setAvailability((prev) => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [shiftKey]: !prev[day]?.[shiftKey]
-      }
-    }));
+    setAvailability((prev) => {
+      const currentDay = prev[day] || {};
+      return {
+        ...prev,
+        [day]: {
+          ...currentDay,
+          [shiftKey]: !currentDay[shiftKey],
+        },
+      };
+    });
   };
 
   const updateCustomTime = (day, field, value) => {
@@ -119,7 +116,7 @@ const App = () => {
       ...prev,
       [day]: {
         ...prev[day],
-        shiftType: prev[day]?.shiftType === shiftType ? "" : shiftType
+        shiftType: prev[day]?.shiftType === shiftType ? "" : shiftType // Toggle if same value
       }
     }));
   };
@@ -149,10 +146,7 @@ const App = () => {
     let total = 0;
     // Add regular shift hours
     for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
-      if (emp) {
-        total += shiftDurations[shiftKey];
-        logDebug(`  Adding ${shiftDurations[shiftKey]} hours from ${shiftKey} shift (${emp.name})`);
-      }
+      if (emp) total += shiftDurations[shiftKey];
     }
     // Add custom time hours
     employees.forEach(emp => {
@@ -161,13 +155,9 @@ const App = () => {
         const start = new Date(`2000-01-01T${customTime.start}`);
         const end = new Date(`2000-01-01T${customTime.end}`);
         const diff = (end - start) / (1000 * 60 * 60);
-        if (diff > 0) {
-          total += diff;
-          logDebug(`  Adding ${diff} hours from custom time (${emp.name})`);
-        }
+        if (diff > 0) total += diff;
       }
     });
-    logDebug(`Total hours for ${day}: ${total}`);
     return total;
   };
 
@@ -409,15 +399,6 @@ const App = () => {
           newSchedule[day][shiftKey] = picked;
           hoursScheduled[picked.name] = (hoursScheduled[picked.name] || 0) + shiftDurations[shiftKey];
           logDebug(`Updated hours for ${picked.name}: ${hoursScheduled[picked.name]}`);
-          
-          // Update current daily total after assignment
-          const newDailyTotal = getDailyTotalHours(day);
-          logDebug(`New daily total for ${day}: ${newDailyTotal}`);
-          
-          if (newDailyTotal >= dailyMax) {
-            logDebug(`Daily total (${newDailyTotal}) >= max (${dailyMax}), stopping assignments for ${day}`);
-            break;
-          }
         }
       }
     }
@@ -439,26 +420,30 @@ const App = () => {
     setSchedule(newSchedule);
   };
 
-  const getScheduledHours = (empName) => {
-    let total = 0;
-    const employee = employees.find(e => e.name === empName);
+  const getScheduledHours = (employee, day) => {
+    const employeeObj = employees.find(e => e.name === employee);
+    if (!employeeObj) return 0;
+
+    let totalHours = 0;
     
-    for (const day of days) {
-      for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
-        if (emp?.name === empName) {
-          total += shiftDurations[shiftKey];
-        }
+    // Count regular shift hours
+    Object.values(schedule[day] || {}).forEach(shift => {
+      if (shift && shift.name === employee) {
+        totalHours += shift.duration;
       }
-      // Add custom time hours if they exist
-      const customTime = employee?.customTimes?.[day];
-      if (customTime?.start && customTime?.end) {
-        const start = new Date(`2000-01-01T${customTime.start}`);
-        const end = new Date(`2000-01-01T${customTime.end}`);
-        const diff = (end - start) / (1000 * 60 * 60); // Convert to hours
-        if (diff > 0) total += diff;
+    });
+
+    // Only count custom hours for the specific day
+    if (employeeObj.customTimes && employeeObj.customTimes[day]) {
+      const customTime = employeeObj.customTimes[day];
+      if (customTime.start && customTime.end) {
+        const start = parseInt(customTime.start.split(':')[0]);
+        const end = parseInt(customTime.end.split(':')[0]);
+        totalHours += end - start;
       }
     }
-    return total;
+
+    return totalHours;
   };
 
   const formatCustomTime = (start, end) => {
@@ -478,8 +463,8 @@ const App = () => {
 
     const newEmployee = {
       name: name.trim(),
-      availability: { ...availability },
-      customTimes: { ...customTimes },
+      availability: JSON.parse(JSON.stringify(availability)),
+      customTimes: JSON.parse(JSON.stringify(customTimes)),
       roles: { ...roles },
       hourGoal: parseInt(hourGoal),
     };
@@ -509,9 +494,9 @@ const App = () => {
   const editEmployee = (index) => {
     const emp = employees[index];
     setName(emp.name);
-    setAvailability({ ...emp.availability });
-    setCustomTimes({ ...emp.customTimes });
-    setRoles({ ...emp.roles });
+    setAvailability(emp.availability);
+    setCustomTimes(emp.customTimes || {});
+    setRoles(emp.roles);
     setHourGoal(emp.hourGoal);
     setEditingIndex(index);
   };
@@ -525,7 +510,7 @@ const App = () => {
         );
         row[day] = shift ? shifts[shift[0]] : "";
       }
-      row["Total Hours"] = getScheduledHours(emp.name);
+      row["Total Hours"] = getScheduledHours(emp.name, "Monday");
       return row;
     });
 
@@ -566,6 +551,14 @@ const App = () => {
     return employees.filter(emp => emp.availability?.[day]?.[shiftKey])
       .map(emp => emp.name)
       .join(", ");
+  };
+
+  const getTotalHoursForEmployee = (empName) => {
+    let total = 0;
+    for (const day of days) {
+      total += getScheduledHours(empName, day);
+    }
+    return total;
   };
 
   return (
@@ -787,7 +780,7 @@ const App = () => {
                           </td>
                         );
                       })}
-                      <td className="border p-2 text-center">{getScheduledHours(emp.name)} hrs</td>
+                      <td className="border p-2 text-center">{getTotalHoursForEmployee(emp.name)} hrs</td>
                       <td className="border p-2 text-center space-x-2">
                         <button
                           className="text-blue-500 hover:text-blue-700"
