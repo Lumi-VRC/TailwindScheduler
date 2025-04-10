@@ -189,6 +189,18 @@ const App = () => {
     return total;
   };
 
+  const formatCustomTime = (start, end) => {
+    if (!start || !end) return "";
+    const formatTime = (time) => {
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'pm' : 'am';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes}${ampm}`;
+    };
+    return `${formatTime(start)}-${formatTime(end)}`;
+  };
+
   const addOrUpdateEmployee = () => {
     if (!name.trim()) return;
 
@@ -464,12 +476,19 @@ const App = () => {
                         const assignedShift = Object.entries(schedule[day] || {}).find(
                           ([, val]) => val?.name === emp.name
                         );
+                        const customTime = emp.customTimes?.[day];
+                        const shiftType = customTime?.shiftType;
+                        const customTimeDisplay = formatCustomTime(customTime?.start, customTime?.end);
+                        
                         return (
                           <td 
                             key={day} 
-                            className={`border p-2 text-sm text-center relative group ${assignedShift ? shiftColors[assignedShift[0]] : ""}`}
+                            className={`border p-2 text-sm text-center relative group ${
+                              assignedShift ? shiftColors[assignedShift[0]] : 
+                              customTime?.start && customTime?.end ? shiftColors[shiftType] : ""
+                            }`}
                           >
-                            {assignedShift ? shifts[assignedShift[0]] : ""}
+                            {assignedShift ? shifts[assignedShift[0]] : customTimeDisplay}
                             <div className="absolute hidden group-hover:block z-10 w-48 p-2 bg-white text-black text-xs rounded shadow-lg">
                               Available: {getAvailableEmployees(day, assignedShift?.[0] || Object.keys(shifts)[0])}
                             </div>
