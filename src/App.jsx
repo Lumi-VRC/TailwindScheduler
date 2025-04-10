@@ -261,6 +261,15 @@ const App = () => {
           driver: roleRequirements[day]?.driver?.[shift] || 0,
           insider: roleRequirements[day]?.insider?.[shift] || 0
         };
+
+        // Count custom times that match this shift type
+        employees.forEach(emp => {
+          if (emp.customTimes?.[day]?.shiftType === shift) {
+            if (emp.roles.manager) requiredRoles.manager = Math.max(0, requiredRoles.manager - 1);
+            if (emp.roles.driver) requiredRoles.driver = Math.max(0, requiredRoles.driver - 1);
+            if (emp.roles.insider) requiredRoles.insider = Math.max(0, requiredRoles.insider - 1);
+          }
+        });
         
         debugLog.push(`\n${shift} shift requirements:`);
         debugLog.push(`  Manager: ${requiredRoles.manager}`);
@@ -279,6 +288,12 @@ const App = () => {
           // Skip if employee is already assigned for this day
           if (assignedEmployees.has(emp.name)) {
             debugLog.push(`  ${emp.name} already assigned for ${day}`);
+            continue;
+          }
+
+          // Skip if employee has a custom time for this day that matches this shift type
+          if (emp.customTimes?.[day]?.shiftType === shift) {
+            debugLog.push(`  ${emp.name} has custom time for ${shift}`);
             continue;
           }
 
