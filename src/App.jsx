@@ -8,12 +8,22 @@ const shifts = {
   Closing: "5pm - 1am",
 };
 
+const shiftDurations = {
+  Opening: 8,
+  Midshift: 5,
+  Closing: 8,
+};
+
+const hourGoalOptions = [8, 16, 24, 32, 40, 999];
+
 const App = () => {
   const [employees, setEmployees] = useState([]);
   const [name, setName] = useState("");
   const [availability, setAvailability] = useState({});
   const [roles, setRoles] = useState({ manager: false, insider: false, driver: false });
+  const [hourGoal, setHourGoal] = useState(40);
   const [schedule, setSchedule] = useState({});
+  const [editingIndex, setEditingIndex] = useState(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("employeeData");
@@ -22,7 +32,7 @@ const App = () => {
 
   useEffect(() => {
     localStorage.setItem("employeeData", JSON.stringify(employees));
-    generateSchedule(); // re-run schedule on change
+    generateSchedule();
   }, [employees]);
 
   const toggleAvailability = (day, shiftKey) => {
@@ -45,6 +55,7 @@ const App = () => {
   };
 
   const generateSchedule = () => {
+    const hoursScheduled = {};
     const newSchedule = {};
 
     for (const day of days) {
@@ -57,37 +68,75 @@ const App = () => {
           continue;
         }
 
-        // Sort by least availability to prioritize less flexible employees
-        const sorted = available.sort((a, b) => {
-          return countAvailableShifts(a) - countAvailableShifts(b);
-        });
+        // Sort: prioritize under-scheduled employees, then least flexible
+        const sorted = available
+          .filter((emp) => {
+            const scheduled = hoursScheduled[emp.name] || 0;
+            const goal = emp.hourGoal || 40;
+            return scheduled + shiftDurations[shiftKey] <= goal + 8;
+          })
+          .sort((a, b) => {
+            const hoursA = hoursScheduled[a.name] || 0;
+            const hoursB = hoursScheduled[b.name] || 0;
+            const flexA = countAvailableShifts(a);
+            const flexB = countAvailableShifts(b);
 
-        // Make sure no one is already assigned that day
+            if (hoursA !== hoursB) return hoursA - hoursB;
+            return flexA - flexB;
+          });
+
         const alreadyAssigned = new Set(
           Object.values(newSchedule[day]).filter(Boolean).map((e) => e.name)
         );
 
         const picked = sorted.find((e) => !alreadyAssigned.has(e.name));
-        newSchedule[day][shiftKey] = picked || null;
+        if (picked) {
+          newSchedule[day][shiftKey] = picked;
+          hoursScheduled[picked.name] = (hoursScheduled[picked.name] || 0) + shiftDurations[shiftKey];
+        } else {
+          newSchedule[day][shiftKey] = null;
+        }
       }
     }
 
     setSchedule(newSchedule);
   };
 
-  const addEmployee = () => {
-    if (!name) return;
-    setEmployees([
-      ...employees,
-      {
-        name,
-        availability: JSON.parse(JSON.stringify(availability)), // deep clone
-        roles: { ...roles },
-      },
-    ]);
+  const getScheduledHours = (empName) => {
+    let total = 0;
+    for (const day of days) {
+      for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
+        if (emp?.name === empName) {
+          total += shiftDurations[shiftKey];
+        }
+      }
+    }
+    return total;
+  };
+
+  const addOrUpdateEmployee = () => {
+    if (!name.trim()) return;
+
+    const newEmployee = {
+      name: name.trim(),
+      availability: JSON.parse(JSON.stringify(availability)),
+      roles: { ...roles },
+      hourGoal: parseInt(hourGoal),
+    };
+
+    const updatedList = [...employees];
+    if (editingIndex !== null) {
+      updatedList[editingIndex] = newEmployee;
+    } else {
+      updatedList.push(newEmployee);
+    }
+
+    setEmployees(updatedList);
     setName("");
     setAvailability({});
     setRoles({ manager: false, insider: false, driver: false });
+    setHourGoal(40);
+    setEditingIndex(null);
   };
 
   const deleteEmployee = (name) => {
@@ -96,10 +145,17 @@ const App = () => {
     }
   };
 
-  const exportToExcel = () => {
-    const exportData = [];
+  const editEmployee = (index) => {
+    const emp = employees[index];
+    setName(emp.name);
+    setAvailability(emp.availability);
+    setRoles(emp.roles);
+    setHourGoal(emp.hourGoal);
+    setEditingIndex(index);
+  };
 
-    for (const emp of employees) {
+  const exportToExcel = () => {
+    const exportData = employees.map((emp) => {
       const row = { Employee: emp.name };
       for (const day of days) {
         const shift = Object.entries(schedule[day] || {}).find(
@@ -107,8 +163,9 @@ const App = () => {
         );
         row[day] = shift ? shifts[shift[0]] : "";
       }
-      exportData.push(row);
-    }
+      row["Total Hours"] = getScheduledHours(emp.name);
+      return row;
+    });
 
     const ws = utils.json_to_sheet(exportData);
     const wb = utils.book_new();
@@ -120,7 +177,7 @@ const App = () => {
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Smart Shift Scheduler</h1>
 
-      {/* Employee Form */}
+      {/* Form */}
       <div className="bg-white rounded-lg p-4 shadow mb-6">
         <input
           className="border p-2 mr-4"
@@ -168,11 +225,26 @@ const App = () => {
           </div>
         </div>
 
+        <div className="mb-2 mt-2">
+          <strong>Hour Goal:</strong>
+          <select
+            value={hourGoal}
+            onChange={(e) => setHourGoal(e.target.value)}
+            className="border p-2 ml-2"
+          >
+            {hourGoalOptions.map((val) => (
+              <option key={val} value={val}>
+                {val === 999 ? "40+" : val + " hrs"}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <button
           className="mt-3 bg-blue-600 text-white px-4 py-2 rounded"
-          onClick={addEmployee}
+          onClick={addOrUpdateEmployee}
         >
-          Add Employee
+          {editingIndex !== null ? "Update Employee" : "Add Employee"}
         </button>
       </div>
 
@@ -185,6 +257,7 @@ const App = () => {
               {days.map((day) => (
                 <th key={day} className="border p-2 bg-gray-100">{day}</th>
               ))}
+              <th className="border p-2 bg-gray-100">Total Hours</th>
               <th className="border p-2 bg-gray-100">Actions</th>
             </tr>
           </thead>
@@ -196,11 +269,11 @@ const App = () => {
               return (
                 <React.Fragment key={roleKey}>
                   <tr>
-                    <td colSpan={days.length + 2} className="bg-gray-200 font-bold p-2 text-left">
+                    <td colSpan={days.length + 3} className="bg-gray-200 font-bold p-2 text-left">
                       {roleKey.charAt(0).toUpperCase() + roleKey.slice(1)}
                     </td>
                   </tr>
-                  {group.map((emp) => (
+                  {group.map((emp, idx) => (
                     <tr key={emp.name}>
                       <td className="border p-2">{emp.name}</td>
                       {days.map((day) => {
@@ -213,7 +286,14 @@ const App = () => {
                           </td>
                         );
                       })}
-                      <td className="border p-2 text-center">
+                      <td className="border p-2 text-center">{getScheduledHours(emp.name)} hrs</td>
+                      <td className="border p-2 text-center space-x-2">
+                        <button
+                          className="text-blue-500 hover:text-blue-700"
+                          onClick={() => editEmployee(employees.indexOf(emp))}
+                        >
+                          Edit
+                        </button>
                         <button
                           className="text-red-500 hover:text-red-700"
                           onClick={() => deleteEmployee(emp.name)}
