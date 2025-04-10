@@ -159,20 +159,57 @@ const App = () => {
     }, 0);
   };
 
+  const getScheduledHours = (employee, day) => {
+    const employeeObj = employees.find(e => e.name === employee);
+    if (!employeeObj) return 0;
+
+    let totalHours = 0;
+    
+    // Count regular shift hours
+    Object.entries(schedule[day] || {}).forEach(([shiftKey, shift]) => {
+      if (shift && shift.name === employee) {
+        const shiftType = shiftKey.split('-')[1];
+        totalHours += shiftDurations[shiftType];
+      }
+    });
+
+    // Only count custom hours for the specific day
+    if (employeeObj.customTimes && employeeObj.customTimes[day]) {
+      const customTime = employeeObj.customTimes[day];
+      if (customTime.start && customTime.end) {
+        const start = parseInt(customTime.start.split(':')[0]);
+        const end = parseInt(customTime.end.split(':')[0]);
+        totalHours += end - start;
+      }
+    }
+
+    return totalHours;
+  };
+
+  const getTotalHoursForEmployee = (empName) => {
+    let total = 0;
+    for (const day of days) {
+      total += getScheduledHours(empName, day);
+    }
+    return total;
+  };
+
   const getDailyTotalHours = (day) => {
     let total = 0;
     // Add regular shift hours
-    for (const [shiftKey, emp] of Object.entries(schedule[day] || {})) {
-      if (emp) total += shiftDurations[shiftKey];
-    }
+    Object.entries(schedule[day] || {}).forEach(([shiftKey, shift]) => {
+      if (shift) {
+        const shiftType = shiftKey.split('-')[1];
+        total += shiftDurations[shiftType];
+      }
+    });
     // Add custom time hours
     employees.forEach(emp => {
       const customTime = emp.customTimes?.[day];
       if (customTime?.start && customTime?.end) {
-        const start = new Date(`2000-01-01T${customTime.start}`);
-        const end = new Date(`2000-01-01T${customTime.end}`);
-        const diff = (end - start) / (1000 * 60 * 60);
-        if (diff > 0) total += diff;
+        const start = parseInt(customTime.start.split(':')[0]);
+        const end = parseInt(customTime.end.split(':')[0]);
+        total += end - start;
       }
     });
     return total;
@@ -268,32 +305,6 @@ const App = () => {
 
     setSchedule(newSchedule);
     setDebugLog(debugLog.join('\n'));
-  };
-
-  const getScheduledHours = (employee, day) => {
-    const employeeObj = employees.find(e => e.name === employee);
-    if (!employeeObj) return 0;
-
-    let totalHours = 0;
-    
-    // Count regular shift hours
-    Object.entries(schedule[day] || {}).forEach(([shiftKey, shift]) => {
-      if (shift && shift.name === employee) {
-        totalHours += shiftDurations[shiftKey];
-      }
-    });
-
-    // Only count custom hours for the specific day
-    if (employeeObj.customTimes && employeeObj.customTimes[day]) {
-      const customTime = employeeObj.customTimes[day];
-      if (customTime.start && customTime.end) {
-        const start = parseInt(customTime.start.split(':')[0]);
-        const end = parseInt(customTime.end.split(':')[0]);
-        totalHours += end - start;
-      }
-    }
-
-    return totalHours;
   };
 
   const formatCustomTime = (start, end) => {
@@ -442,14 +453,6 @@ const App = () => {
     return employees.filter(emp => emp.availability?.[day]?.[shiftKey])
       .map(emp => emp.name)
       .join(", ");
-  };
-
-  const getTotalHoursForEmployee = (empName) => {
-    let total = 0;
-    for (const day of days) {
-      total += getScheduledHours(empName, day);
-    }
-    return total;
   };
 
   // Update role requirement
