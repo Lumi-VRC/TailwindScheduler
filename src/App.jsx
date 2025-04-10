@@ -182,10 +182,13 @@ const App = () => {
     let totalHours = 0;
     
     // Count regular shift hours
-    Object.entries(schedule[day] || {}).forEach(([shiftKey, shift]) => {
-      if (shift && shift.name === employee) {
-        const shiftType = shiftKey.split('-')[1];
-        totalHours += shiftDurations[shiftType];
+    Object.entries(schedule[day] || {}).forEach(([shiftKey, shifts]) => {
+      if (Array.isArray(shifts)) {
+        const employeeShifts = shifts.filter(shift => shift.name === employee);
+        if (employeeShifts.length > 0) {
+          const shiftType = shiftKey.split('-')[1];
+          totalHours += shiftDurations[shiftType];
+        }
       }
     });
 
