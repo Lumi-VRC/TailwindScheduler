@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { utils, writeFile } from "xlsx";
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const shiftTimes = {
+const shifts = {
   Opening: "9:30am-5:30pm",
   Midshift: "4pm - 9pm",
   Closing: "5pm - 1am",
@@ -13,8 +13,7 @@ const App = () => {
   const [name, setName] = useState("");
   const [availability, setAvailability] = useState({});
   const [roles, setRoles] = useState({ manager: false, insider: false, driver: false });
-
-  const [shiftPicker, setShiftPicker] = useState({ open: false, day: "", setFunc: null });
+  const [schedule, setSchedule] = useState({});
 
   useEffect(() => {
     const saved = localStorage.getItem("employeeData");
@@ -23,28 +22,57 @@ const App = () => {
 
   useEffect(() => {
     localStorage.setItem("employeeData", JSON.stringify(employees));
+    generateSchedule(); // re-run schedule on change
   }, [employees]);
 
-  const openShiftPicker = (day, updateFunc) => {
-    setShiftPicker({ open: true, day, setFunc: updateFunc });
-  };
-
-  const selectShift = (label) => {
-    if (!shiftPicker.setFunc || !shiftPicker.day) return;
-    shiftPicker.setFunc((prev) => ({
-      ...prev,
-      [shiftPicker.day]: shiftTimes[label],
-    }));
-    setShiftPicker({ open: false, day: "", setFunc: null });
-  };
-
-  const clearShift = () => {
-    shiftPicker.setFunc((prev) => {
-      const updated = { ...prev };
-      delete updated[shiftPicker.day];
-      return updated;
+  const toggleAvailability = (day, shiftKey) => {
+    setAvailability((prev) => {
+      const currentDay = prev[day] || {};
+      return {
+        ...prev,
+        [day]: {
+          ...currentDay,
+          [shiftKey]: !currentDay[shiftKey],
+        },
+      };
     });
-    setShiftPicker({ open: false, day: "", setFunc: null });
+  };
+
+  const countAvailableShifts = (employee) => {
+    return Object.values(employee.availability || {}).reduce((total, shiftSet) => {
+      return total + Object.values(shiftSet).filter(Boolean).length;
+    }, 0);
+  };
+
+  const generateSchedule = () => {
+    const newSchedule = {};
+
+    for (const day of days) {
+      newSchedule[day] = {};
+
+      for (const shiftKey of Object.keys(shifts)) {
+        const available = employees.filter((e) => e.availability?.[day]?.[shiftKey]);
+        if (available.length === 0) {
+          newSchedule[day][shiftKey] = null;
+          continue;
+        }
+
+        // Sort by least availability to prioritize less flexible employees
+        const sorted = available.sort((a, b) => {
+          return countAvailableShifts(a) - countAvailableShifts(b);
+        });
+
+        // Make sure no one is already assigned that day
+        const alreadyAssigned = new Set(
+          Object.values(newSchedule[day]).filter(Boolean).map((e) => e.name)
+        );
+
+        const picked = sorted.find((e) => !alreadyAssigned.has(e.name));
+        newSchedule[day][shiftKey] = picked || null;
+      }
+    }
+
+    setSchedule(newSchedule);
   };
 
   const addEmployee = () => {
@@ -53,7 +81,7 @@ const App = () => {
       ...employees,
       {
         name,
-        availability: { ...availability },
+        availability: JSON.parse(JSON.stringify(availability)), // deep clone
         roles: { ...roles },
       },
     ]);
@@ -69,13 +97,18 @@ const App = () => {
   };
 
   const exportToExcel = () => {
-    const exportData = employees.map((emp) => {
+    const exportData = [];
+
+    for (const emp of employees) {
       const row = { Employee: emp.name };
-      days.forEach((day) => {
-        row[day] = emp.availability[day] || "";
-      });
-      return row;
-    });
+      for (const day of days) {
+        const shift = Object.entries(schedule[day] || {}).find(
+          ([, val]) => val?.name === emp.name
+        );
+        row[day] = shift ? shifts[shift[0]] : "";
+      }
+      exportData.push(row);
+    }
 
     const ws = utils.json_to_sheet(exportData);
     const wb = utils.book_new();
@@ -84,10 +117,10 @@ const App = () => {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Weekly Shift Scheduler</h1>
+    <div className="p-6 max-w-6xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Smart Shift Scheduler</h1>
 
-      {/* Form */}
+      {/* Employee Form */}
       <div className="bg-white rounded-lg p-4 shadow mb-6">
         <input
           className="border p-2 mr-4"
@@ -97,18 +130,22 @@ const App = () => {
         />
 
         <div className="mb-2 mt-2">
-          <strong>Availability (click day to assign shift):</strong>
-          <div className="flex flex-wrap gap-2 mt-1">
+          <strong>Availability:</strong>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-2">
             {days.map((day) => (
-              <button
-                key={day}
-                onClick={() => openShiftPicker(day, setAvailability)}
-                className={`px-2 py-1 border rounded ${
-                  availability[day] ? "bg-blue-200" : "bg-gray-100"
-                }`}
-              >
-                {day}{availability[day] ? `: ${availability[day]}` : ""}
-              </button>
+              <div key={day}>
+                <div className="font-semibold">{day}</div>
+                {Object.keys(shifts).map((shiftKey) => (
+                  <label key={shiftKey} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={availability[day]?.[shiftKey] || false}
+                      onChange={() => toggleAvailability(day, shiftKey)}
+                    />
+                    {shiftKey} <span className="text-sm text-gray-500">({shifts[shiftKey]})</span>
+                  </label>
+                ))}
+              </div>
             ))}
           </div>
         </div>
@@ -166,11 +203,16 @@ const App = () => {
                   {group.map((emp) => (
                     <tr key={emp.name}>
                       <td className="border p-2">{emp.name}</td>
-                      {days.map((day) => (
-                        <td key={day} className="border p-2 text-sm text-center">
-                          {emp.availability[day] || ""}
-                        </td>
-                      ))}
+                      {days.map((day) => {
+                        const assignedShift = Object.entries(schedule[day] || {}).find(
+                          ([, val]) => val?.name === emp.name
+                        );
+                        return (
+                          <td key={day} className="border p-2 text-sm text-center">
+                            {assignedShift ? shifts[assignedShift[0]] : ""}
+                          </td>
+                        );
+                      })}
                       <td className="border p-2 text-center">
                         <button
                           className="text-red-500 hover:text-red-700"
@@ -207,30 +249,6 @@ const App = () => {
           Clear All
         </button>
       </div>
-
-      {/* Shift Picker Modal */}
-      {shiftPicker.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-md w-[300px] text-center">
-            <h2 className="text-lg font-semibold mb-4">Select shift for {shiftPicker.day}</h2>
-            {Object.entries(shiftTimes).map(([label, time]) => (
-              <button
-                key={label}
-                className="w-full text-left px-4 py-2 border rounded mb-2 hover:bg-gray-100"
-                onClick={() => selectShift(label)}
-              >
-                {label} — <span className="text-sm text-gray-600">{time}</span>
-              </button>
-            ))}
-            <button
-              className="text-sm text-gray-500 mt-2 underline"
-              onClick={clearShift}
-            >
-              Clear this day
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
