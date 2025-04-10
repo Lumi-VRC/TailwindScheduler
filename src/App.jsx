@@ -29,18 +29,6 @@ const App = () => {
   const [customTimes, setCustomTimes] = useState({});
   const [roles, setRoles] = useState({ manager: false, insider: false, driver: false });
   const [hourGoal, setHourGoal] = useState(40);
-  const [dailyHourGoals, setDailyHourGoals] = useState(() => {
-    const saved = localStorage.getItem("dailyHourGoals");
-    return saved ? JSON.parse(saved) : {
-      Monday: 40,
-      Tuesday: 40,
-      Wednesday: 40,
-      Thursday: 40,
-      Friday: 40,
-      Saturday: 40,
-      Sunday: 40
-    };
-  });
   const [schedule, setSchedule] = useState({});
   const [editingIndex, setEditingIndex] = useState(null);
   const [debugLog, setDebugLog] = useState([]);
@@ -59,11 +47,6 @@ const App = () => {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.setItem("darkMode", isDark.toString());
   };
-
-  // Save daily hour goals when they change
-  useEffect(() => {
-    localStorage.setItem("dailyHourGoals", JSON.stringify(dailyHourGoals));
-  }, [dailyHourGoals]);
 
   useEffect(() => {
     const saved = localStorage.getItem("employeeData");
@@ -165,6 +148,135 @@ const App = () => {
     setDebugLog(prev => [...prev, message]);
   };
 
+  const generateSchedule = () => {
+    setDebugLog([]); // Clear debug log
+    logDebug("Starting schedule generation");
+    logDebug(`Total employees: ${employees.length}`);
+
+    // Pre-calculate custom time hours for each employee
+    const customHours = {};
+    employees.forEach(emp => {
+      logDebug(`\nAnalyzing ${emp.name}'s custom times:`);
+      customHours[emp.name] = {};
+      let totalCustomHours = 0;
+      
+      for (const day of days) {
+        if (emp.customTimes?.[day]) {
+          const customTime = emp.customTimes[day];
+          if (customTime.start && customTime.end) {
+            const start = parseInt(customTime.start.split(':')[0]);
+            const end = parseInt(customTime.end.split(':')[0]);
+            const hours = end - start;
+            customHours[emp.name][day] = hours;
+            totalCustomHours += hours;
+            logDebug(`  ${day}: ${customTime.start}-${customTime.end} (${hours} hours) - Type: ${customTime.shiftType}`);
+          }
+        }
+      }
+      logDebug(`${emp.name} total custom hours: ${totalCustomHours}`);
+    });
+
+    // Assign shifts based on employee goals
+    for (const day of days) {
+      logDebug(`\n=== Processing ${day} ===`);
+      logDebug("Processing shifts in order:", Object.keys(shifts).join(", "), "(by duration)");
+
+      for (const [shiftKey, shift] of Object.entries(shifts)) {
+        logDebug(`\n--- Processing ${shiftKey} shift (${shift.duration} hours) ---`);
+        logDebug("Current schedule for", day + ":", JSON.stringify(schedule[day] || {}));
+
+        // Find available employees who haven't met their goal
+        const availableEmployees = employees.filter(emp => {
+          const scheduledHours = Object.values(schedule).reduce((total, daySchedule) => {
+            return total + (Object.values(daySchedule).find(s => s?.name === emp.name)?.duration || 0);
+          }, 0);
+          
+          const dayCustomHours = customHours[emp.name]?.[day] || 0;
+          const totalHours = scheduledHours + dayCustomHours;
+          const wouldExceedGoal = totalHours + shift.duration > emp.hourGoal;
+
+          logDebug(`\nChecking ${emp.name}:`);
+          logDebug(`  Scheduled hours: ${scheduledHours}`);
+          logDebug(`  Custom hours: ${dayCustomHours}`);
+          logDebug(`  Current total: ${totalHours}`);
+          logDebug(`  Goal hours: ${emp.hourGoal}`);
+          logDebug(`  This shift: ${shiftKey} (${shift.duration} hours)`);
+          logDebug(`  Would be total: ${totalHours + shift.duration}`);
+          logDebug(`  Distance from goal: ${emp.hourGoal - totalHours}`);
+          logDebug(`  Would exceed goal: ${wouldExceedGoal}`);
+          logDebug(`  ${emp.name} regular availability: ${emp.availability?.[day]?.[shiftKey] ? "available" : "not available"}`);
+
+          return (
+            !wouldExceedGoal &&
+            emp.availability?.[day]?.[shiftKey] &&
+            (!schedule[day]?.[shiftKey] || schedule[day][shiftKey].name !== emp.name)
+          );
+        });
+
+        logDebug("Available employees who haven't met their goal:", availableEmployees.map(e => e.name).join(", "));
+        logDebug("Already assigned employees for", day + ":", Object.values(schedule[day] || {}).map(s => s?.name).filter(Boolean).join(", "));
+
+        if (availableEmployees.length > 0) {
+          // Sort by distance from goal (those furthest from goal get priority)
+          availableEmployees.sort((a, b) => {
+            const aHours = Object.values(schedule).reduce((total, daySchedule) => {
+              return total + (Object.values(daySchedule).find(s => s?.name === a.name)?.duration || 0);
+            }, 0);
+            
+            const bHours = Object.values(schedule).reduce((total, daySchedule) => {
+              return total + (Object.values(daySchedule).find(s => s?.name === b.name)?.duration || 0);
+            }, 0);
+            
+            return (a.hourGoal - aHours) - (b.hourGoal - bHours);
+          });
+
+          const selectedEmployee = availableEmployees[0];
+          logDebug("Selected", selectedEmployee.name, "for", shiftKey, "shift");
+          
+          if (!schedule[day]) schedule[day] = {};
+          schedule[day][shiftKey] = {
+            name: selectedEmployee.name,
+            duration: shift.duration,
+            availability: selectedEmployee.availability,
+            customTimes: selectedEmployee.customTimes,
+            roles: selectedEmployee.roles,
+            hourGoal: selectedEmployee.hourGoal
+          };
+          
+          const newHours = Object.values(schedule).reduce((total, daySchedule) => {
+            return total + (Object.values(daySchedule).find(s => s?.name === selectedEmployee.name)?.duration || 0);
+          }, 0);
+          logDebug("Updated hours for", selectedEmployee.name + ":", newHours);
+        } else {
+          logDebug("No available employees for", shiftKey, "shift");
+        }
+      }
+    }
+
+    // Print final schedule
+    logDebug("\n=== Final Schedule Summary ===");
+    for (const day of days) {
+      logDebug(`\n${day}:`);
+      for (const [shiftKey, shift] of Object.entries(shifts)) {
+        logDebug(`  ${shiftKey}: ${schedule[day]?.[shiftKey]?.name || "unfilled"}`);
+      }
+    }
+
+    // Print final hours summary
+    logDebug("\n=== Final Hours Summary ===");
+    for (const emp of employees) {
+      const scheduledHours = Object.values(schedule).reduce((total, daySchedule) => {
+        return total + (Object.values(daySchedule).find(s => s?.name === emp.name)?.duration || 0);
+      }, 0);
+      
+      const customHoursTotal = Object.values(customHours[emp.name] || {}).reduce((total, hours) => total + hours, 0);
+      
+      logDebug(`${emp.name}: ${scheduledHours} scheduled + ${customHoursTotal} custom = ${scheduledHours + customHoursTotal} total (goal: ${emp.hourGoal})`);
+    }
+
+    setSchedule({ ...schedule });
+  };
+
   const getScheduledHours = (employee, day) => {
     const employeeObj = employees.find(e => e.name === employee);
     if (!employeeObj) return 0;
@@ -172,16 +284,11 @@ const App = () => {
     let totalHours = 0;
     
     // Count regular shift hours
-    if (schedule[day]) {
-      Object.entries(schedule[day]).forEach(([shiftKey, shift]) => {
-        if (shift && shift.name === employee) {
-          const duration = shiftDurations[shiftKey];
-          if (typeof duration === 'number' && !isNaN(duration)) {
-            totalHours += duration;
-          }
-        }
-      });
-    }
+    Object.entries(schedule[day] || {}).forEach(([shiftKey, shift]) => {
+      if (shift && shift.name === employee) {
+        totalHours += shiftDurations[shiftKey];
+      }
+    });
 
     // Only count custom hours for the specific day
     if (employeeObj.customTimes && employeeObj.customTimes[day]) {
@@ -189,17 +296,11 @@ const App = () => {
       if (customTime.start && customTime.end) {
         const start = parseInt(customTime.start.split(':')[0]);
         const end = parseInt(customTime.end.split(':')[0]);
-        if (!isNaN(start) && !isNaN(end)) {
-          totalHours += end - start;
-        }
+        totalHours += end - start;
       }
     }
 
     return totalHours;
-  };
-
-  const getTotalHoursForEmployee = (employee) => {
-    return days.reduce((total, day) => total + getScheduledHours(employee, day), 0);
   };
 
   const formatCustomTime = (start, end) => {
@@ -266,7 +367,7 @@ const App = () => {
         );
         row[day] = shift ? shifts[shift[0]] : "";
       }
-      row["Total Hours"] = getTotalHoursForEmployee(emp.name);
+      row["Total Hours"] = getScheduledHours(emp.name, "Monday");
       return row;
     });
 
@@ -309,278 +410,12 @@ const App = () => {
       .join(", ");
   };
 
-  const generateSchedule = () => {
-    setDebugLog([]); // Clear debug log
-    logDebug("Starting schedule generation");
-    logDebug(`Total employees: ${employees.length}`);
-    logDebug("Daily goals:", dailyHourGoals);
-
-    // Pre-calculate custom time hours for each employee
-    const customHours = {};
-    employees.forEach(emp => {
-      logDebug(`\nAnalyzing ${emp.name}'s custom times:`);
-      customHours[emp.name] = {};
-      let totalCustomHours = 0;
-      
-      for (const day of days) {
-        if (emp.customTimes?.[day]) {
-          const customTime = emp.customTimes[day];
-          if (customTime.start && customTime.end) {
-            const start = parseInt(customTime.start.split(':')[0]);
-            const end = parseInt(customTime.end.split(':')[0]);
-            if (!isNaN(start) && !isNaN(end)) {
-              const hours = end - start;
-              customHours[emp.name][day] = hours;
-              totalCustomHours += hours;
-              logDebug(`  ${day}: ${customTime.start}-${customTime.end} (${hours} hours) - Type: ${customTime.shiftType}`);
-            }
-          }
-        }
-      }
-      logDebug(`${emp.name} total custom hours: ${totalCustomHours}`);
-    });
-
-    // First pass: Assign shifts based on employee goals
+  const getTotalHoursForEmployee = (empName) => {
+    let total = 0;
     for (const day of days) {
-      logDebug(`\n=== Processing ${day} (Goal: ${dailyHourGoals[day]} hours) ===`);
-      logDebug("Processing shifts in order:", Object.keys(shifts).join(", "), "(by duration)");
-
-      for (const [shiftKey, shift] of Object.entries(shifts)) {
-        const shiftDuration = shiftDurations[shiftKey];
-        logDebug(`\n--- Processing ${shiftKey} shift (${shiftDuration} hours) ---`);
-        logDebug("Current schedule for", day + ":", JSON.stringify(schedule[day] || {}));
-
-        // Find available employees who haven't met their goal
-        const availableEmployees = employees.filter(emp => {
-          const scheduledHours = getTotalHoursForEmployee(emp.name);
-          const dayCustomHours = customHours[emp.name]?.[day] || 0;
-          const totalHours = scheduledHours + dayCustomHours;
-          const wouldExceedGoal = totalHours + shiftDuration > emp.hourGoal;
-
-          logDebug(`\nChecking ${emp.name}:`);
-          logDebug(`  Scheduled hours: ${scheduledHours}`);
-          logDebug(`  Custom hours: ${dayCustomHours}`);
-          logDebug(`  Current total: ${totalHours}`);
-          logDebug(`  Goal hours: ${emp.hourGoal}`);
-          logDebug(`  This shift: ${shiftKey} (${shiftDuration} hours)`);
-          logDebug(`  Would be total: ${totalHours + shiftDuration}`);
-          logDebug(`  Distance from goal: ${emp.hourGoal - totalHours}`);
-          logDebug(`  Would exceed goal: ${wouldExceedGoal}`);
-          logDebug(`  ${emp.name} regular availability: ${emp.availability?.[day]?.[shiftKey] ? "available" : "not available"}`);
-
-          return (
-            !wouldExceedGoal &&
-            emp.availability?.[day]?.[shiftKey] &&
-            (!schedule[day]?.[shiftKey] || schedule[day][shiftKey].name !== emp.name)
-          );
-        });
-
-        logDebug("Available employees who haven't met their goal:", availableEmployees.map(e => e.name).join(", "));
-        logDebug("Already assigned employees for", day + ":", Object.values(schedule[day] || {}).map(s => s?.name).filter(Boolean).join(", "));
-
-        if (availableEmployees.length > 0) {
-          // Sort by distance from goal (those furthest from goal get priority)
-          availableEmployees.sort((a, b) => {
-            const aHours = getTotalHoursForEmployee(a.name);
-            const bHours = getTotalHoursForEmployee(b.name);
-            
-            return (a.hourGoal - aHours) - (b.hourGoal - bHours);
-          });
-
-          const selectedEmployee = availableEmployees[0];
-          logDebug("Selected", selectedEmployee.name, "for", shiftKey, "shift");
-          
-          if (!schedule[day]) schedule[day] = {};
-          schedule[day][shiftKey] = {
-            name: selectedEmployee.name,
-            duration: shiftDuration,
-            availability: selectedEmployee.availability,
-            customTimes: selectedEmployee.customTimes,
-            roles: selectedEmployee.roles,
-            hourGoal: selectedEmployee.hourGoal
-          };
-          
-          const newHours = getTotalHoursForEmployee(selectedEmployee.name);
-          logDebug("Updated hours for", selectedEmployee.name + ":", newHours);
-        } else {
-          logDebug("No available employees for", shiftKey, "shift");
-        }
-      }
+      total += getScheduledHours(empName, day);
     }
-
-    // Second pass: Fill remaining shifts to meet daily goals
-    for (const day of days) {
-      if (dailyHourGoals[day] === 0) {
-        logDebug(`\nSkipping ${day} - zero hour goal`);
-        continue;
-      }
-
-      logDebug(`\n=== Processing ${day} for daily goals ===`);
-      const currentDailyTotal = getTotalHoursForEmployee(employees[0].name);
-      const dailyMin = Math.max(0, dailyHourGoals[day] - 8);
-      const dailyMax = dailyHourGoals[day] + 8;
-      
-      logDebug(`Current daily total: ${currentDailyTotal}`);
-      logDebug(`Daily goal: ${dailyHourGoals[day]}`);
-      logDebug(`Daily min: ${dailyMin}`);
-      logDebug(`Daily max: ${dailyMax}`);
-      logDebug("Processing shifts in order:", Object.keys(shifts).join(", "), "(by duration)");
-
-      for (const [shiftKey, shift] of Object.entries(shifts)) {
-        logDebug(`\n--- Processing ${shiftKey} shift for daily goals ---`);
-        
-        if (schedule[day]?.[shiftKey]) {
-          logDebug(`Shift ${shiftKey} already filled by ${schedule[day][shiftKey].name}, skipping`);
-          continue;
-        }
-
-        const availableEmployees = employees.filter(emp => {
-          const scheduledHours = getTotalHoursForEmployee(emp.name);
-          const dayCustomHours = customHours[emp.name]?.[day] || 0;
-          const totalHours = scheduledHours + dayCustomHours;
-          const wouldExceedGoal = totalHours + shiftDurations[shiftKey] > emp.hourGoal;
-
-          logDebug(`\nChecking ${emp.name} for ${shiftKey} shift:`);
-          logDebug(`  Scheduled hours: ${scheduledHours}`);
-          logDebug(`  Custom hours: ${dayCustomHours}`);
-          logDebug(`  Current total: ${totalHours}`);
-          logDebug(`  Goal hours: ${emp.hourGoal}`);
-          logDebug(`  This shift: ${shiftKey} (${shiftDurations[shiftKey]} hours)`);
-          logDebug(`  Would be total: ${totalHours + shiftDurations[shiftKey]}`);
-          logDebug(`  Would exceed goal: ${wouldExceedGoal}`);
-          if (emp.customTimes?.[day]) {
-            logDebug(`  Has custom time: does not match shift`);
-          } else {
-            logDebug(`  Regular availability: ${emp.availability?.[day]?.[shiftKey] ? "available" : "not available"}`);
-          }
-
-          return (
-            !wouldExceedGoal &&
-            emp.availability?.[day]?.[shiftKey] &&
-            !emp.customTimes?.[day] // Don't assign if they have a custom time
-          );
-        });
-
-        logDebug("Available employees for", shiftKey, "shift:", availableEmployees.map(e => e.name).join(", "));
-
-        if (availableEmployees.length > 0 && currentDailyTotal < dailyMax) {
-          // Sort by total hours (those with fewer hours get priority)
-          availableEmployees.sort((a, b) => {
-            const aHours = getTotalHoursForEmployee(a.name);
-            const bHours = getTotalHoursForEmployee(b.name);
-            
-            return aHours - bHours;
-          });
-
-          const selectedEmployee = availableEmployees[0];
-          logDebug("Selected", selectedEmployee.name, "for", shiftKey, "shift to meet daily goal");
-          
-          if (!schedule[day]) schedule[day] = {};
-          schedule[day][shiftKey] = {
-            name: selectedEmployee.name,
-            duration: shiftDurations[shiftKey],
-            availability: selectedEmployee.availability,
-            customTimes: selectedEmployee.customTimes,
-            roles: selectedEmployee.roles,
-            hourGoal: selectedEmployee.hourGoal
-          };
-        } else {
-          logDebug("No available employees for", shiftKey, "shift");
-        }
-      }
-    }
-
-    // Print final schedule
-    logDebug("\n=== Final Schedule Summary ===");
-    for (const day of days) {
-      logDebug(`\n${day}:`);
-      for (const [shiftKey, shift] of Object.entries(shifts)) {
-        logDebug(`  ${shiftKey}: ${schedule[day]?.[shiftKey]?.name || "unfilled"}`);
-      }
-    }
-
-    // Print final hours summary
-    logDebug("\n=== Final Hours Summary ===");
-    for (const emp of employees) {
-      const scheduledHours = getTotalHoursForEmployee(emp.name);
-      const customHoursTotal = Object.values(customHours[emp.name] || {}).reduce((total, hours) => total + hours, 0);
-      
-      logDebug(`${emp.name}: ${scheduledHours} scheduled + ${customHoursTotal} custom = ${scheduledHours + customHoursTotal} total (goal: ${emp.hourGoal})`);
-    }
-
-    // New optimization pass: Remove smallest shifts from employees who have exceeded their goals
-    logDebug("\n=== Starting Optimization Pass ===");
-    for (const day of days) {
-      if (dailyHourGoals[day] === 0) {
-        logDebug(`Skipping ${day} - zero hour goal`);
-        continue;
-      }
-
-      const currentDailyTotal = getTotalHoursForEmployee(employees[0].name);
-      const hoursNeeded = dailyHourGoals[day];
-      const difference = currentDailyTotal - hoursNeeded;
-
-      logDebug(`\nOptimizing ${day}:`);
-      logDebug(`  Current daily total: ${currentDailyTotal}`);
-      logDebug(`  Hours needed: ${hoursNeeded}`);
-      logDebug(`  Current difference: ${difference}`);
-
-      if (difference > 0) {
-        // Find all employees working this day who have exceeded their goals
-        const employeesWorkingToday = Object.entries(schedule[day] || {})
-          .filter(shift => shift && shift.name)
-          .map(shift => ({
-            name: shift.name,
-            shiftKey: shift.shift,
-            duration: shiftDurations[shift.shift],
-            totalHours: getTotalHoursForEmployee(shift.name)
-          }))
-          .filter(emp => emp.totalHours > employees.find(e => e.name === emp.name).hourGoal)
-          .sort((a, b) => a.duration - b.duration); // Sort by shift duration, smallest first
-
-        logDebug(`  Employees working today who have exceeded their goals:`, 
-          employeesWorkingToday.map(e => `${e.name} (${e.shiftKey}, ${e.duration}h, total: ${e.totalHours}h)`).join(", "));
-
-        // Try removing the smallest shifts first
-        for (const emp of employeesWorkingToday) {
-          const newDailyTotal = currentDailyTotal - emp.duration;
-          const newDifference = newDailyTotal - hoursNeeded;
-
-          logDebug(`  Considering removing ${emp.shiftKey} (${emp.duration}h) from ${emp.name}:`);
-          logDebug(`    New daily total would be: ${newDailyTotal}`);
-          logDebug(`    New difference would be: ${newDifference}`);
-
-          // Only remove the shift if it brings us closer to the goal
-          if (Math.abs(newDifference) < Math.abs(difference)) {
-            logDebug(`    Removing shift - brings us closer to goal`);
-            delete schedule[day][emp.shiftKey];
-            break; // Only remove one shift at a time
-          } else {
-            logDebug(`    Keeping shift - would not improve the difference`);
-          }
-        }
-      }
-    }
-
-    // Print final optimized schedule
-    logDebug("\n=== Final Optimized Schedule Summary ===");
-    for (const day of days) {
-      logDebug(`\n${day}:`);
-      for (const [shiftKey, shift] of Object.entries(shifts)) {
-        logDebug(`  ${shiftKey}: ${schedule[day]?.[shiftKey]?.name || "unfilled"}`);
-      }
-    }
-
-    // Print final optimized hours summary
-    logDebug("\n=== Final Optimized Hours Summary ===");
-    for (const emp of employees) {
-      const scheduledHours = getTotalHoursForEmployee(emp.name);
-      const customHoursTotal = Object.values(customHours[emp.name] || {}).reduce((total, hours) => total + hours, 0);
-      
-      logDebug(`${emp.name}: ${scheduledHours} scheduled + ${customHoursTotal} custom = ${scheduledHours + customHoursTotal} total (goal: ${emp.hourGoal})`);
-    }
-
-    setSchedule(schedule);
+    return total;
   };
 
   return (
@@ -729,28 +564,6 @@ const App = () => {
         </button>
       </div>
 
-      {/* Add Daily Hour Goals */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-6">
-        <h2 className="text-lg font-bold mb-4">Daily Hour Goals</h2>
-        <div className="grid grid-cols-7 gap-4">
-          {days.map(day => (
-            <div key={day} className="flex flex-col">
-              <label className="text-sm font-medium mb-1">{day}</label>
-              <input
-                type="number"
-                value={dailyHourGoals[day]}
-                onChange={(e) => setDailyHourGoals(prev => ({
-                  ...prev,
-                  [day]: parseInt(e.target.value) || 0
-                }))}
-                className="border p-2 rounded text-black"
-                min="0"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Schedule Grid */}
       <div className="overflow-auto">
         <table className="table-auto border-collapse w-full mb-4">
@@ -831,30 +644,6 @@ const App = () => {
                 </td>
               ))}
               <td className="border p-2" colSpan="2"></td>
-            </tr>
-            {/* Add Daily Total Hours Row */}
-            <tr className="bg-gray-100 dark:bg-gray-700 font-bold">
-              <td className="border p-2">Daily Total Hours</td>
-              {days.map(day => (
-                <td key={day} className="border p-2 text-center">
-                  {getDailyTotalHours(day)}
-                </td>
-              ))}
-              <td className="border p-2"></td>
-              <td className="border p-2"></td>
-            </tr>
-            {/* Add Hours Needed Row */}
-            <tr className="bg-gray-100 dark:bg-gray-700 font-bold">
-              <td className="border p-2">Hours Needed</td>
-              {days.map(day => (
-                <td key={day} className="border p-2 text-center">
-                  {dailyHourGoals[day]}
-                </td>
-              ))}
-              <td className="border p-2 text-center">
-                {Object.values(dailyHourGoals).reduce((sum, hours) => sum + hours, 0)}
-              </td>
-              <td className="border p-2"></td>
             </tr>
           </tbody>
         </table>
