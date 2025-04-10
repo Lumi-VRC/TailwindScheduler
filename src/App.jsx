@@ -35,6 +35,15 @@ const App = () => {
     generateSchedule();
   }, [employees]);
 
+  // Add auto-refresh effect
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      generateSchedule();
+    }, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(refreshInterval); // Cleanup on unmount
+  }, []);
+
   const toggleAvailability = (day, shiftKey) => {
     setAvailability((prev) => {
       const currentDay = prev[day] || {};
