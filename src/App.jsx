@@ -760,14 +760,13 @@ const App = () => {
             <thead>
               <tr>
                 <th className="border p-2 font-bold">Day</th>
-                <th colSpan="3" className="border p-2 font-bold text-center">Managers</th>
+                <th colSpan="2" className="border p-2 font-bold text-center">Managers</th>
                 <th colSpan="3" className="border p-2 font-bold text-center">Drivers</th>
                 <th colSpan="3" className="border p-2 font-bold text-center">Insiders</th>
               </tr>
               <tr>
                 <th className="border p-2"></th>
                 <th className="border p-2 font-bold">Opening</th>
-                <th className="border p-2 font-bold">Midshift</th>
                 <th className="border p-2 font-bold">Closing</th>
                 <th className="border p-2 font-bold">Opening</th>
                 <th className="border p-2 font-bold">Midshift</th>
@@ -788,15 +787,6 @@ const App = () => {
                       min="0"
                       value={roleRequirements[day].manager.Opening}
                       onChange={(e) => updateRoleRequirement(day, 'manager', 'Opening', parseInt(e.target.value))}
-                      className="w-16 border p-1 text-center text-black"
-                    />
-                  </td>
-                  <td className="border p-2">
-                    <input
-                      type="number"
-                      min="0"
-                      value={roleRequirements[day].manager.Midshift}
-                      onChange={(e) => updateRoleRequirement(day, 'manager', 'Midshift', parseInt(e.target.value))}
                       className="w-16 border p-1 text-center text-black"
                     />
                   </td>
