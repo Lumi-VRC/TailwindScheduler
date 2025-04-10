@@ -184,147 +184,65 @@ const App = () => {
 
   const generateSchedule = () => {
     const newSchedule = {};
-    const employeeHours = {};
     const debugLog = [];
 
-    // Initialize structures
+    // Initialize empty schedule
     days.forEach(day => {
       newSchedule[day] = {};
-      employeeHours[day] = {};
     });
 
-    // First pass: Fill role requirements
+    // For each day
     days.forEach(day => {
-      const shifts = ['opening', 'midshift', 'closing'];
+      debugLog.push(`\nProcessing ${day}:`);
       
-      // Sort days by how hard they are to fill (fewer available employees = harder)
-      const availableEmployeesByDay = {};
-      days.forEach(d => {
-        availableEmployeesByDay[d] = employees.filter(emp => 
-          shifts.some(shift => emp.availability[d]?.[shift])
-        ).length;
-      });
-      
-      // Sort days from hardest to easiest to fill
-      const sortedDays = [...days].sort((a, b) => 
-        availableEmployeesByDay[a] - availableEmployeesByDay[b]
-      );
-
-      sortedDays.forEach(currentDay => {
-        shifts.forEach(shift => {
-          const shiftKey = `${currentDay}-${shift}`;
-          const roles = ['manager', 'driver', 'insider'];
-          
-          roles.forEach(role => {
-            const requiredCount = roleRequirements[currentDay][role][shift];
-            let assignedCount = 0;
-
-            // Get available employees who can fill this role
-            const availableEmployees = employees.filter(emp => 
-              emp.roles[role] && 
-              emp.availability[currentDay]?.[shift] &&
-              !newSchedule[currentDay][shiftKey]?.includes(emp.name) &&
-              !Object.values(newSchedule[currentDay]).some(shifts => 
-                shifts.includes(emp.name)
-              )
-            );
-
-            // Sort available employees by how close they are to their goal
-            availableEmployees.sort((a, b) => {
-              const aHours = Object.values(employeeHours).reduce((total, dayHours) => 
-                total + (dayHours[a.name] || 0), 0
-              );
-              const bHours = Object.values(employeeHours).reduce((total, dayHours) => 
-                total + (dayHours[b.name] || 0), 0
-              );
-              return aHours - bHours; // Prioritize employees with fewer hours
-            });
-
-            // Assign employees to meet role requirements
-            for (const emp of availableEmployees) {
-              if (assignedCount >= requiredCount) break;
-              
-              if (!newSchedule[currentDay][shiftKey]) {
-                newSchedule[currentDay][shiftKey] = [];
-              }
-              
-              newSchedule[currentDay][shiftKey].push(emp.name);
-              employeeHours[currentDay][emp.name] = (employeeHours[currentDay][emp.name] || 0) + shiftDurations[shiftKey];
-              assignedCount++;
-            }
-          });
-        });
-      });
-    });
-
-    // Second pass: Fill any remaining unfilled slots
-    days.forEach(day => {
-      const shifts = ['opening', 'midshift', 'closing'];
-      
-      shifts.forEach(shift => {
+      // For each shift
+      ['opening', 'midshift', 'closing'].forEach(shift => {
         const shiftKey = `${day}-${shift}`;
-        const roles = ['manager', 'driver', 'insider'];
+        newSchedule[day][shiftKey] = [];
         
-        roles.forEach(role => {
-          const requiredCount = roleRequirements[day][role][shift];
-          const currentCount = newSchedule[day][shiftKey]?.length || 0;
-          
-          if (currentCount < requiredCount) {
-            // Get any available employee who can fill this role
-            const availableEmployees = employees.filter(emp => 
-              emp.roles[role] && 
-              emp.availability[day]?.[shift] &&
-              !newSchedule[day][shiftKey]?.includes(emp.name) &&
-              !Object.values(newSchedule[day]).some(shifts => 
-                shifts.includes(emp.name)
-              )
-            );
+        // Get role requirements for this shift
+        const requiredRoles = {
+          manager: roleRequirements[day].manager[shift],
+          driver: roleRequirements[day].driver[shift],
+          insider: roleRequirements[day].insider[shift]
+        };
+        
+        debugLog.push(`\n${shift} shift requirements:`);
+        debugLog.push(`  Manager: ${requiredRoles.manager}`);
+        debugLog.push(`  Driver: ${requiredRoles.driver}`);
+        debugLog.push(`  Insider: ${requiredRoles.insider}`);
 
-            // Sort by total hours to prioritize those with fewer hours
-            availableEmployees.sort((a, b) => {
-              const aHours = Object.values(employeeHours).reduce((total, dayHours) => 
-                total + (dayHours[a.name] || 0), 0
-              );
-              const bHours = Object.values(employeeHours).reduce((total, dayHours) => 
-                total + (dayHours[b.name] || 0), 0
-              );
-              return aHours - bHours;
-            });
-
-            // Assign remaining employees
-            for (const emp of availableEmployees) {
-              if (currentCount >= requiredCount) break;
-              
-              if (!newSchedule[day][shiftKey]) {
-                newSchedule[day][shiftKey] = [];
-              }
-              
+        // For each employee
+        employees.forEach(emp => {
+          // Check if employee is available for this shift
+          if (emp.availability[day]?.[shift]) {
+            // Check if we still need this role
+            if (emp.roles.manager && requiredRoles.manager > 0) {
               newSchedule[day][shiftKey].push(emp.name);
-              employeeHours[day][emp.name] = (employeeHours[day][emp.name] || 0) + shiftDurations[shiftKey];
+              requiredRoles.manager--;
+              debugLog.push(`  Assigned ${emp.name} as manager`);
+            }
+            else if (emp.roles.driver && requiredRoles.driver > 0) {
+              newSchedule[day][shiftKey].push(emp.name);
+              requiredRoles.driver--;
+              debugLog.push(`  Assigned ${emp.name} as driver`);
+            }
+            else if (emp.roles.insider && requiredRoles.insider > 0) {
+              newSchedule[day][shiftKey].push(emp.name);
+              requiredRoles.insider--;
+              debugLog.push(`  Assigned ${emp.name} as insider`);
             }
           }
         });
-      });
-    });
 
-    // Log the final schedule
-    debugLog.push("Final Schedule:");
-    days.forEach(day => {
-      debugLog.push(`\n${day}:`);
-      const shifts = ['opening', 'midshift', 'closing'];
-      shifts.forEach(shift => {
-        const shiftKey = `${day}-${shift}`;
-        debugLog.push(`  ${shift}: ${newSchedule[day][shiftKey]?.join(', ') || 'unfilled'}`);
+        // Log remaining requirements
+        if (requiredRoles.manager > 0 || requiredRoles.driver > 0 || requiredRoles.insider > 0) {
+          debugLog.push(`  Unfilled requirements:`);
+          if (requiredRoles.manager > 0) debugLog.push(`    Manager: ${requiredRoles.manager}`);
+          if (requiredRoles.driver > 0) debugLog.push(`    Driver: ${requiredRoles.driver}`);
+          if (requiredRoles.insider > 0) debugLog.push(`    Insider: ${requiredRoles.insider}`);
+        }
       });
-    });
-
-    // Log employee hours
-    debugLog.push("\nEmployee Hours:");
-    employees.forEach(emp => {
-      const totalHours = Object.values(employeeHours).reduce((total, dayHours) => 
-        total + (dayHours[emp.name] || 0), 0
-      );
-      debugLog.push(`${emp.name}: ${totalHours} hours (goal: ${emp.hourGoal})`);
     });
 
     setSchedule(newSchedule);
