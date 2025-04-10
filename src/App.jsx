@@ -275,15 +275,19 @@ const App = () => {
             continue;
           }
 
-          // Check if employee has exceeded their hour goal
-          const currentHours = getTotalHoursForEmployee(emp.name);
-          if (currentHours >= emp.hourGoal) {
-            debugLog.push(`  ${emp.name} has reached hour goal (${currentHours}/${emp.hourGoal})`);
-            continue;
-          }
-
           // Check if employee is available for this shift
           if (emp.availability?.[day]?.[shift]) {
+            // Calculate hours if this shift were added
+            const currentHours = getTotalHoursForEmployee(emp.name);
+            const shiftHours = shiftDurations[shift];
+            const totalHoursAfterShift = currentHours + shiftHours;
+
+            // Only skip if adding this shift would exceed their hour goal
+            if (totalHoursAfterShift > emp.hourGoal) {
+              debugLog.push(`  ${emp.name} would exceed hour goal (${totalHoursAfterShift}/${emp.hourGoal})`);
+              continue;
+            }
+
             // Check if we still need this role
             if (emp.roles.manager && requiredRoles.manager > 0) {
               newSchedule[day][shiftKey].push({
