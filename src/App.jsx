@@ -97,20 +97,16 @@ const App = () => {
   useEffect(() => {
     try {
       localStorage.setItem("employeeData", JSON.stringify(employees));
-      generateSchedule(employees);
+      generateSchedule();
     } catch (error) {
       console.error("Error saving employee data:", error);
     }
   }, [employees]);
 
-  // Add auto-refresh effect with cleanup
+  // Regenerate schedule when role requirements change
   useEffect(() => {
-    const refreshInterval = setInterval(() => {
-      generateSchedule(employees);
-    }, 5000);
-
-    return () => clearInterval(refreshInterval);
-  }, [employees]);
+    generateSchedule();
+  }, [roleRequirements]);
 
   // Save role requirements to localStorage
   useEffect(() => {
