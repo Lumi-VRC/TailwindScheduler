@@ -656,19 +656,6 @@ const App = () => {
             reasons.push(`Missing ${required.insider - assigned.insider} Insider(s) for ${shift}`);
         }
      }
-
-
-    // Specific legacy checks (can potentially be removed if requirements table is source of truth)
-    // Kept for now to match original intent, but check against requirements is better
-    // if (assignedCounts.Opening.manager === 0 && roleRequirements[day]?.manager?.Opening > 0) reasons.push("Missing Opening Manager");
-    // if (assignedCounts.Closing.manager === 0 && roleRequirements[day]?.manager?.Closing > 0) reasons.push("Missing Closing Manager");
-    // if (assignedCounts.Opening.driver === 0 && roleRequirements[day]?.driver?.Opening > 0) reasons.push("Missing Opening Driver");
-    // if (assignedCounts.Midshift.driver === 0 && roleRequirements[day]?.driver?.Midshift > 0) reasons.push("Missing Midshift Driver");
-    // if (assignedCounts.Closing.driver === 0 && roleRequirements[day]?.driver?.Closing > 0) reasons.push("Missing Closing Driver");
-    // if (assignedCounts.Opening.insider === 0 && roleRequirements[day]?.insider?.Opening > 0) reasons.push("Missing Opening Insider");
-    // if (assignedCounts.Midshift.insider === 0 && roleRequirements[day]?.insider?.Midshift > 0) reasons.push("Missing Midshift Insider");
-
-
     return {
       covered: reasons.length === 0,
       reasons: reasons // Return the detailed reasons
