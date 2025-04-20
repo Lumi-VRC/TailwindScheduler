@@ -516,12 +516,6 @@ const App = () => {
     setSchedule(newSchedule);
   };
 
-    console.log("--- Schedule Generation Complete ---");
-    // console.log("Final Schedule Object:", JSON.stringify(newSchedule, null, 2)); // Optional: Log full schedule object
-    setSchedule(newSchedule);
-    // No debug log state to set anymore
-  };
-
   const formatCustomTime = (start, end) => {
     if (!start || !end) return "";
     const formatTime = (time) => {
@@ -1172,5 +1166,5 @@ const App = () => {
       </div>
     </div>
   );
-
+};
 export default App;
