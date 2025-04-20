@@ -228,26 +228,38 @@ const App = () => {
     }
     return total;
   };
+
+
+  // --- REVISED AND CORRECTED getDailyTotalHours ---
   const getDailyTotalHours = (day) => {
-    let total = 0;
-    // Add regular shift hours
-    Object.entries(schedule[day] || {}).forEach(([shiftKey, shift]) => {
-      if (shift) {
-        const shiftType = shiftKey.split('-')[1];
-        total += shiftDurations[shiftType];
+    let totalHours = 0;
+    const daySchedule = schedule[day] || {};
+
+    // Iterate through each shiftKey (e.g., "Monday-Opening")
+    Object.entries(daySchedule).forEach(([shiftKey, assignedEmployees]) => {
+      const shiftType = shiftKey.split('-')[1]; // Get Opening, Midshift, Closing
+
+      if (Array.isArray(assignedEmployees)) {
+        assignedEmployees.forEach(assignment => {
+          // Prioritize specific custom hours if stored on the assignment
+          if (assignment.isCustom && typeof assignment.customHours === 'number') {
+            totalHours += assignment.customHours;
+             // console.log(`[Daily Total ${day}] Adding custom hours ${assignment.customHours.toFixed(1)} for ${assignment.name} (${shiftKey})`);
+          }
+          // Otherwise, use the standard duration for the shift type
+          else if (shiftDurations[shiftType]) {
+            totalHours += shiftDurations[shiftType];
+             // console.log(`[Daily Total ${day}] Adding standard hours ${shiftDurations[shiftType]} for ${assignment.name} (${shiftKey})`);
+          } else {
+             console.warn(`[Daily Total ${day}] Unknown shiftType ${shiftType} for assignment ${assignment.name}. Cannot add hours.`);
+          }
+        });
       }
     });
-    // Add custom time hours
-    employees.forEach(emp => {
-      const customTime = emp.customTimes?.[day];
-      if (customTime?.start && customTime?.end) {
-        const start = parseInt(customTime.start.split(':')[0]);
-        const end = parseInt(customTime.end.split(':')[0]);
-        total += end - start;
-      }
-    });
-    return total;
+
+    return totalHours;
   };
+
 
   const generateSchedule = (currentEmployees = employees) => {
     console.log("--- Starting Schedule Generation ---");
