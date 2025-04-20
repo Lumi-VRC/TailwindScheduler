@@ -673,11 +673,15 @@ const App = () => {
     };
   };
 
-  const getAvailableEmployees = (day, shiftKey, role) => {
+  // Modified: Gets available employees for a specific day, shift type, and role
+  const getAvailableEmployees = (day, shiftType, role) => {
     return employees
-      .filter(emp => emp.roles?.[role] && emp.availability?.[day]?.[shiftKey])
+      .filter(emp =>
+        emp.roles?.[role] && // Check if employee has the specified role
+        emp.availability?.[day]?.[shiftType] // Check standard availability for the shift type
+      )
       .map(emp => emp.name)
-      .join(", ");
+      .join(", ") || "None";
   };
 
   // Update role requirement
@@ -957,27 +961,56 @@ const App = () => {
             <tr>
               <th className="border p-2 bg-gray-100 dark:bg-gray-700">Employee</th>
               {days.map((day) => {
-                // Calculate availability strings for the tooltip *outside* the JSX return
-                const availableOpeners = getAvailableForShift(day, 'Opening');
-                const availableMidshifters = getAvailableForShift(day, 'Midshift');
-                const availableClosers = getAvailableForShift(day, 'Closing');
+                // Calculate availability strings for the detailed tooltip
+                const avail = {
+                  Opening: {
+                    manager: getAvailableEmployees(day, 'Opening', 'manager'),
+                    insider: getAvailableEmployees(day, 'Opening', 'insider'),
+                    driver: getAvailableEmployees(day, 'Opening', 'driver'),
+                  },
+                  Midshift: {
+                    // manager: getAvailableEmployees(day, 'Midshift', 'manager'), // Midshift Managers often not required/available
+                    insider: getAvailableEmployees(day, 'Midshift', 'insider'),
+                    driver: getAvailableEmployees(day, 'Midshift', 'driver'),
+                  },
+                  Closing: {
+                    manager: getAvailableEmployees(day, 'Closing', 'manager'),
+                    insider: getAvailableEmployees(day, 'Closing', 'insider'),
+                    driver: getAvailableEmployees(day, 'Closing', 'driver'),
+                  }
+                };
 
                 return (
                   <th key={day} className="border p-2 bg-gray-100 dark:bg-gray-700 relative group"> {/* Added relative group */}
                     {day}
                     {/* Tooltip Div */}
-                    <div className="absolute hidden group-hover:block z-20 w-64 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs rounded shadow-lg left-0 mt-1 text-left font-normal whitespace-normal">
-                      <div className="font-bold mb-1">Available ({day}):</div>
-                      <div className="mb-1">
-                        <strong className="text-blue-600 dark:text-blue-400">Opening:</strong> {availableOpeners}
+                    <div className="absolute hidden group-hover:block z-20 w-72 p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs rounded shadow-lg left-0 mt-1 text-left font-normal whitespace-normal">
+                      <div className="font-bold mb-2 text-center border-b pb-1">Available ({day})</div>
+
+                      {/* Opening Section */}
+                      <div className="mb-2">
+                        <div className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Opening:</div>
+                        <div className="ml-2">M: {avail.Opening.manager}</div>
+                        <div className="ml-2">I: {avail.Opening.insider}</div>
+                        <div className="ml-2">D: {avail.Opening.driver}</div>
                       </div>
-                      <div className="mb-1">
-                        <strong className="text-green-600 dark:text-green-400">Midshift:</strong> {availableMidshifters}
+
+                      {/* Midshift Section */}
+                      <div className="mb-2">
+                        <div className="font-semibold text-green-600 dark:text-green-400 mb-1">Midshift:</div>
+                        {/* <div className="ml-2">M: {avail.Midshift.manager}</div> */}
+                        <div className="ml-2">I: {avail.Midshift.insider}</div>
+                        <div className="ml-2">D: {avail.Midshift.driver}</div>
                       </div>
+
+                      {/* Closing Section */}
                       <div>
-                        <strong className="text-red-600 dark:text-red-400">Closing:</strong> {availableClosers}
+                        <div className="font-semibold text-red-600 dark:text-red-400 mb-1">Closing:</div>
+                        <div className="ml-2">M: {avail.Closing.manager}</div>
+                        <div className="ml-2">I: {avail.Closing.insider}</div>
+                        <div className="ml-2">D: {avail.Closing.driver}</div>
                       </div>
-                      {/* Note: This does not explicitly check custom time definitions, only the standard availability checkboxes. */}
+                       {/* Note: This checks standard availability checkboxes, not custom time definitions */}
                     </div>
                   </th>
                 );
