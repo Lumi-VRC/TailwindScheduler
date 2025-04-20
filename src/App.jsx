@@ -462,7 +462,10 @@ const App = () => {
                    }
                }
   
-               if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere || !emp.availability?.[day]?.[shiftType]) {
+               // MODIFIED Check: Consider BOTH standard availability and relevant custom times
+               const isAvailable = emp.availability?.[day]?.[shiftType] || emp.customTimes?.[day]?.shiftType === shiftType;
+
+               if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere || !isAvailable) {
                    return; // Skip if unavailable or already working today/this shift
                }
   
@@ -502,7 +505,10 @@ const App = () => {
                       }
                    }
   
-                   if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere || !emp.availability?.[day]?.[shiftType]) {
+                   // MODIFIED Check: Consider BOTH standard availability and relevant custom times
+                   const isAvailable = emp.availability?.[day]?.[shiftType] || emp.customTimes?.[day]?.shiftType === shiftType;
+
+                   if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere || !isAvailable) {
                        return; // Skip
                    }
   
@@ -693,11 +699,13 @@ const App = () => {
   };
 
   // Modified: Gets available employees for a specific day, shift type, and role
+  // Modified: Gets available employees for a specific day, shift type, and role
   const getAvailableEmployees = (day, shiftType, role) => {
     return employees
       .filter(emp =>
         emp.roles?.[role] && // Check if employee has the specified role
-        emp.availability?.[day]?.[shiftType] // Check standard availability for the shift type
+        // Check BOTH standard availability OR custom time linked to this shift type
+        (emp.availability?.[day]?.[shiftType] || emp.customTimes?.[day]?.shiftType === shiftType)
       )
       .map(emp => emp.name)
       .join(", ") || "None";
