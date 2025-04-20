@@ -945,9 +945,32 @@ const App = () => {
           <thead>
             <tr>
               <th className="border p-2 bg-gray-100 dark:bg-gray-700">Employee</th>
-              {days.map((day) => (
-                <th key={day} className="border p-2 bg-gray-100 dark:bg-gray-700">{day}</th>
-              ))}
+              {days.map((day) => {
+                // Calculate availability strings for the tooltip *outside* the JSX return
+                const availableOpeners = getAvailableForShift(day, 'Opening');
+                const availableMidshifters = getAvailableForShift(day, 'Midshift');
+                const availableClosers = getAvailableForShift(day, 'Closing');
+
+                return (
+                  <th key={day} className="border p-2 bg-gray-100 dark:bg-gray-700 relative group"> {/* Added relative group */}
+                    {day}
+                    {/* Tooltip Div */}
+                    <div className="absolute hidden group-hover:block z-20 w-64 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-black dark:text-white text-xs rounded shadow-lg left-0 mt-1 text-left font-normal whitespace-normal">
+                      <div className="font-bold mb-1">Available ({day}):</div>
+                      <div className="mb-1">
+                        <strong className="text-blue-600 dark:text-blue-400">Opening:</strong> {availableOpeners}
+                      </div>
+                      <div className="mb-1">
+                        <strong className="text-green-600 dark:text-green-400">Midshift:</strong> {availableMidshifters}
+                      </div>
+                      <div>
+                        <strong className="text-red-600 dark:text-red-400">Closing:</strong> {availableClosers}
+                      </div>
+                      {/* Note: This does not explicitly check custom time definitions, only the standard availability checkboxes. */}
+                    </div>
+                  </th>
+                );
+              })}
               <th className="border p-2 bg-gray-100 dark:bg-gray-700">Total Hours</th>
               <th className="border p-2 bg-gray-100 dark:bg-gray-700">Actions</th>
             </tr>
