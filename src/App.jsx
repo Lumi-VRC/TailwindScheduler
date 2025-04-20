@@ -253,7 +253,7 @@ const App = () => {
     console.log("--- Starting Schedule Generation ---");
     const newSchedule = {};
     const currentWeekHours = {}; // Track hours assigned *during* this run
-
+  
     // Initialize empty schedule and hour tracker
     currentEmployees.forEach(emp => {
       currentWeekHours[emp.name] = 0; // Start everyone at 0 for this run
@@ -264,57 +264,49 @@ const App = () => {
         newSchedule[day][`${day}-${shift}`] = []; // Initialize shift slots as arrays
       });
     });
-
-    // --- Pre-assign custom times tied to specific shifts ---
+  
+    // --- Phase 1: Pre-assign custom times tied to specific shifts (Respecting Caps) ---
     console.log("\n--- Phase 1: Pre-assigning Custom Times ---");
     days.forEach(day => {
-      // Track roles filled by custom times *per shift* to respect caps
       const customRolesFilledThisDay = {
           Opening: { manager: 0, driver: 0, insider: 0 },
           Midshift: { manager: 0, driver: 0, insider: 0 },
           Closing: { manager: 0, driver: 0, insider: 0 }
       };
-
+  
       currentEmployees.forEach(emp => {
         const customTime = emp.customTimes?.[day];
         if (customTime?.start && customTime?.end && customTime.shiftType) {
-          const shiftType = customTime.shiftType; // Opening, Midshift, Closing
+          const shiftType = customTime.shiftType;
           const shiftKey = `${day}-${shiftType}`;
-
-          // --- Check 1: Has this employee already been added to this specific shift? ---
+  
           const alreadyAssignedThisShift = newSchedule[day]?.[shiftKey]?.some(e => e.name === emp.name);
           if (alreadyAssignedThisShift) {
-            console.warn(` [Custom Time] Skipping duplicate assignment for ${emp.name} to ${shiftKey}. Employee already assigned.`);
-            return; // Skip this specific custom time entry
+            // console.warn(` [Custom Time] Skipping duplicate assignment for ${emp.name} to ${shiftKey}.`); // Less verbose
+            return;
           }
-
-          // --- Check 2: Does assigning this employee exceed the role requirement cap for this shift? ---
+  
           const baseRequirements = roleRequirements[day] || {};
-          const shiftRequirements = baseRequirements[shiftType] || {}; // Requirements for Opening/Midshift/Closing
-
-          let assignedRoleForCustom = null; // Determine which role this custom shift fills
+          const shiftRequirements = baseRequirements[shiftType] || {};
+  
+          let assignedRoleForCustom = null;
            if (emp.roles.manager && (shiftRequirements.manager || 0) > 0) assignedRoleForCustom = 'manager';
            else if (emp.roles.driver && (shiftRequirements.driver || 0) > 0) assignedRoleForCustom = 'driver';
            else if (emp.roles.insider && (shiftRequirements.insider || 0) > 0) assignedRoleForCustom = 'insider';
-           // If no specific role required (req=0) or employee doesn't have a needed role, maybe still assign?
-           // For now, let's prioritize filling required roles first within caps.
-           // If assignedRoleForCustom is null, maybe it shouldn't count against caps? Or assign if total cap allows? Let's be strict for now.
-
+  
            if (!assignedRoleForCustom) {
-               console.log(` [Custom Time] Skipping ${emp.name} for ${shiftKey}. No specific required role matched or requirement is 0.`);
-               // Optionally, allow assignment if total shift capacity isn't met, even if specific role isn't required? Needs more complex logic.
-               return; // Skip if no required role match
+               // console.log(` [Custom Time] Skipping ${emp.name} for ${shiftKey}. No required role match.`);
+               return;
            }
-
+  
           const currentFilledCount = customRolesFilledThisDay[shiftType]?.[assignedRoleForCustom] || 0;
           const requiredCount = shiftRequirements[assignedRoleForCustom] || 0;
-
+  
           if (currentFilledCount >= requiredCount) {
-            console.log(` [Custom Time] Skipping ${emp.name} as ${assignedRoleForCustom} for ${shiftKey}. Role cap (${requiredCount}) already met by other custom times.`);
-            return; // Skip, cap met
+            // console.log(` [Custom Time] Skipping ${emp.name} as ${assignedRoleForCustom} for ${shiftKey}. Role cap (${requiredCount}) met.`);
+            return;
           }
-
-          // --- Calculate custom hours ---
+  
           const start = new Date(`1970-01-01T${customTime.start}:00`);
           const end = new Date(`1970-01-01T${customTime.end}:00`);
           let customHours = 0;
@@ -322,199 +314,226 @@ const App = () => {
               customHours = (end - start) / (1000 * 60 * 60);
            } else {
               console.warn(`[Custom Time] Invalid time for ${emp.name} on ${day}: ${customTime.start}-${customTime.end}`);
-              customHours = 0; // Assign 0 hours if time is invalid
            }
-
-          // --- Check 3: Hour Goal ---
+  
           const hoursAfterCustom = currentWeekHours[emp.name] + customHours;
-          if (hoursAfterCustom > emp.hourGoal && currentWeekHours[emp.name] > 0) { // Allow if current hours are 0
-            console.log(` [Custom Time] Skipping ${emp.name} for ${shiftKey} (Custom) - exceeds goal. Hours: ${currentWeekHours[emp.name].toFixed(1)} + ${customHours.toFixed(1)} > ${emp.hourGoal}`);
-            return; // Skip if exceeds goal (and not their first shift)
+          if (hoursAfterCustom > emp.hourGoal && currentWeekHours[emp.name] > 0) {
+            // console.log(` [Custom Time] Skipping ${emp.name} for ${shiftKey} (Custom) - exceeds goal.`);
+            return;
           }
-
-          // --- Assign Custom Shift ---
+  
           console.log(` [Custom Time] Assigning ${emp.name} as ${assignedRoleForCustom} to ${shiftKey} (${customTime.start}-${customTime.end}, ${customHours.toFixed(1)} hrs). Cap: ${currentFilledCount+1}/${requiredCount}. Hours: ${currentWeekHours[emp.name].toFixed(1)} -> ${hoursAfterCustom.toFixed(1)} / ${emp.hourGoal}`);
           newSchedule[day][shiftKey].push({
-              name: emp.name,
-              roles: emp.roles,
-              isCustom: true,
-              customDisplay: formatCustomTime(customTime.start, customTime.end),
-              customHours: customHours // Store calculated hours
+              name: emp.name, roles: emp.roles, isCustom: true,
+              customDisplay: formatCustomTime(customTime.start, customTime.end), customHours: customHours
           });
           currentWeekHours[emp.name] = hoursAfterCustom;
-          customRolesFilledThisDay[shiftType][assignedRoleForCustom]++; // Increment filled count for this role/shift
-
+          customRolesFilledThisDay[shiftType][assignedRoleForCustom]++;
         }
       });
     });
-
-
-    // --- Assign regular shifts ---
-    console.log("\n--- Phase 2: Assigning Regular Shifts ---");
+  
+  
+    // --- Phase 2: Assign regular shifts based on Priority ---
+    console.log("\n--- Phase 2: Assigning Regular Shifts (Prioritized) ---");
     days.forEach(day => {
       console.log(`\nProcessing ${day}:`);
-
-      ['Opening', 'Midshift', 'Closing'].forEach(shiftType => { // Renamed 'shift' to 'shiftType' for clarity
-        const shiftKey = `${day}-${shiftType}`;
-        console.log(` -> Processing Shift: ${shiftKey}`);
-        const shiftHourDuration = shiftDurations[shiftType];
-
-        // Calculate base requirements
-        const baseRequirements = {
-          manager: roleRequirements[day]?.manager?.[shiftType] || 0,
-          driver: roleRequirements[day]?.driver?.[shiftType] || 0,
-          insider: roleRequirements[day]?.insider?.[shiftType] || 0
-        };
-        // console.log(`    Base Requirements: M:${baseRequirements.manager}, D:${baseRequirements.driver}, I:${baseRequirements.insider}`);
-
-        // Calculate roles ALREADY filled (custom or regular from previous phases/days)
-        const currentAssignments = newSchedule[day][shiftKey];
-        const rolesAlreadyFilled = { manager: 0, driver: 0, insider: 0 };
-        currentAssignments.forEach(assignment => {
-            if (assignment.roles.manager) rolesAlreadyFilled.manager++;
-            if (assignment.roles.driver) rolesAlreadyFilled.driver++;
-            if (assignment.roles.insider) rolesAlreadyFilled.insider++;
-        });
-        // console.log(`    Already Filled: M:${rolesAlreadyFilled.manager}, D:${rolesAlreadyFilled.driver}, I:${rolesAlreadyFilled.insider}`);
-
-
-        // Calculate remaining needs for the assignment passes
-        const requiredRoles = {
-            manager: Math.max(0, baseRequirements.manager - rolesAlreadyFilled.manager),
-            driver: Math.max(0, baseRequirements.driver - rolesAlreadyFilled.driver),
-            insider: Math.max(0, baseRequirements.insider - rolesAlreadyFilled.insider),
-        };
-         console.log(`    Remaining Needs for Passes: M:${requiredRoles.manager}, D:${requiredRoles.driver}, I:${requiredRoles.insider}`);
-
-
-        let totalRequired = requiredRoles.manager + requiredRoles.driver + requiredRoles.insider;
-
-        if (totalRequired <= 0 ) {
-          console.log(`    All role requirements met for ${shiftKey}. Skipping assignment passes.`);
-          return; // Skip assignment passes if specific role needs met
-        }
-
-        // Sort employees by current hours *tracked during this run* (ascending)
-        const potentialEmployees = [...currentEmployees].sort((a, b) => {
-          const hoursA = currentWeekHours[a.name] || 0;
-          const hoursB = currentWeekHours[b.name] || 0;
-          if (hoursA !== hoursB) {
-              return hoursA - hoursB;
+  
+      // --- Calculate Shift Priorities ---
+      const shiftPriorities = ['Opening', 'Midshift', 'Closing'].map(shiftType => {
+          const shiftKey = `${day}-${shiftType}`;
+          const baseRequirements = {
+            manager: roleRequirements[day]?.manager?.[shiftType] || 0,
+            driver: roleRequirements[day]?.driver?.[shiftType] || 0,
+            insider: roleRequirements[day]?.insider?.[shiftType] || 0
+          };
+  
+          const currentAssignments = newSchedule[day][shiftKey] || [];
+          const rolesAlreadyFilled = { manager: 0, driver: 0, insider: 0 };
+          currentAssignments.forEach(assignment => {
+              if (assignment.roles.manager) rolesAlreadyFilled.manager++;
+              if (assignment.roles.driver) rolesAlreadyFilled.driver++;
+              if (assignment.roles.insider) rolesAlreadyFilled.insider++;
+          });
+  
+          const remainingNeeds = {
+              manager: Math.max(0, baseRequirements.manager - rolesAlreadyFilled.manager),
+              driver: Math.max(0, baseRequirements.driver - rolesAlreadyFilled.driver),
+              insider: Math.max(0, baseRequirements.insider - rolesAlreadyFilled.insider),
+          };
+          const totalRemainingNeed = remainingNeeds.manager + remainingNeeds.driver + remainingNeeds.insider;
+  
+          if (totalRemainingNeed === 0) {
+              return { shiftType, score: Infinity }; // Already filled, lowest priority
           }
-          return 0; // Keep stable if hours are equal
-        });
-        // console.log(`    Sorted Potential Employees (Top 5):`, potentialEmployees.slice(0, 5).map(e => `${e.name} (${(currentWeekHours[e.name] || 0).toFixed(1)}hrs)`));
-
-
-        // --- Assignment Pass 1: Try to assign UNDER OR AT hour goal ---
-        console.log(`    Starting Pass 1 (Under/At Goal)`);
-        let assignedInPass1 = new Set();
-
-         potentialEmployees.forEach(emp => {
-             if (totalRequired <= 0) return; // Stop if all roles filled in this pass
-
-             const empCurrentHours = currentWeekHours[emp.name] || 0;
-             const hoursAfterShift = empCurrentHours + shiftHourDuration;
-
-             // Check if already assigned to this specific shift slot OR anywhere else today
-             const alreadyAssignedThisShift = newSchedule[day]?.[shiftKey]?.some(e => e.name === emp.name);
-             let alreadyAssignedTodayElsewhere = false;
-             for (const sk in newSchedule[day]) {
-                 if (sk !== shiftKey && newSchedule[day][sk]?.some(e => e.name === emp.name)) {
-                     alreadyAssignedTodayElsewhere = true;
-                     break;
-                 }
-             }
-
-             if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere) {
-                 // console.log(`     SKIP (P1): ${emp.name} - Already assigned today/shift.`);
-                 return;
-             }
-             if (!emp.availability?.[day]?.[shiftType]) { // Use shiftType here
-                 // console.log(`     SKIP (P1): ${emp.name} - Not available for ${shiftKey}`);
-                 return;
-             }
-
-             // Try to assign if UNDER OR EQUAL to goal
-             if (hoursAfterShift <= emp.hourGoal) {
-                 let assignedRole = null;
-                 // ** Assign role only if that specific role is still needed **
-                 if (emp.roles.manager && requiredRoles.manager > 0) assignedRole = 'manager';
-                 else if (emp.roles.driver && requiredRoles.driver > 0) assignedRole = 'driver';
-                 else if (emp.roles.insider && requiredRoles.insider > 0) assignedRole = 'insider';
-
-                 if (assignedRole) {
-                     console.log(`     ASSIGN (P1): ${emp.name} as ${assignedRole} to ${shiftKey}. Hours: ${empCurrentHours.toFixed(1)} -> ${hoursAfterShift.toFixed(1)} / ${emp.hourGoal}. Needs left: M:${requiredRoles.manager- (assignedRole==='manager'?1:0)}, D:${requiredRoles.driver - (assignedRole==='driver'?1:0)}, I:${requiredRoles.insider- (assignedRole==='insider'?1:0)}`);
-                     newSchedule[day][shiftKey].push({ name: emp.name, roles: emp.roles, isCustom: false }); // Mark as not custom
-                     requiredRoles[assignedRole]--;
-                     totalRequired--;
-                     currentWeekHours[emp.name] = hoursAfterShift;
-                     assignedInPass1.add(emp.name);
-                 } // else: console log for skipping if needed (role not needed, etc)
-             } // else: console log for skipping if needed (over goal)
-         });
-
-
-        // --- Assignment Pass 2: If requirements still unmet, assign OVER hour goal ---
-         if (totalRequired > 0) {
-             console.log(`    Starting Pass 2 (Over Goal, Needs M:${requiredRoles.manager}, D:${requiredRoles.driver}, I:${requiredRoles.insider})`);
-             potentialEmployees.forEach(emp => {
-                 if (totalRequired <= 0) return; // Stop if filled
-                 if (assignedInPass1.has(emp.name)) return; // Skip if already assigned in Pass 1
-
-                 const empCurrentHours = currentWeekHours[emp.name] || 0;
-                 const hoursAfterShift = empCurrentHours + shiftHourDuration;
-
-                 // Check if already assigned to this specific shift slot OR anywhere else today
-                 const alreadyAssignedThisShift = newSchedule[day]?.[shiftKey]?.some(e => e.name === emp.name);
-                 let alreadyAssignedTodayElsewhere = false;
-                 for (const sk in newSchedule[day]) {
-                    if (sk !== shiftKey && newSchedule[day][sk]?.some(e => e.name === emp.name)) {
-                        alreadyAssignedTodayElsewhere = true;
-                        break;
-                    }
-                 }
-
-                 if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere) {
-                    // console.log(`     SKIP (P2): ${emp.name} - Already assigned today/shift.`);
-                     return;
-                 }
-                 if (!emp.availability?.[day]?.[shiftType]) { // Use shiftType here
-                     // console.log(`     SKIP (P2): ${emp.name} - Not available for ${shiftKey}`);
-                     return;
-                 }
-
-                 // Assign regardless of goal if role needed
-                 let assignedRole = null;
-                 // ** Assign role only if that specific role is still needed **
-                 if (emp.roles.manager && requiredRoles.manager > 0) assignedRole = 'manager';
-                 else if (emp.roles.driver && requiredRoles.driver > 0) assignedRole = 'driver';
-                 else if (emp.roles.insider && requiredRoles.insider > 0) assignedRole = 'insider';
-
-                 if (assignedRole) {
-                     console.log(`     ASSIGN (P2): ${emp.name} as ${assignedRole} to ${shiftKey}. Hours: ${empCurrentHours.toFixed(1)} -> ${hoursAfterShift.toFixed(1)} / ${emp.hourGoal}. Needs left: M:${requiredRoles.manager- (assignedRole==='manager'?1:0)}, D:${requiredRoles.driver - (assignedRole==='driver'?1:0)}, I:${requiredRoles.insider- (assignedRole==='insider'?1:0)}`);
-                     newSchedule[day][shiftKey].push({ name: emp.name, roles: emp.roles, isCustom: false }); // Mark as not custom
-                     requiredRoles[assignedRole]--;
-                     totalRequired--;
-                     currentWeekHours[emp.name] = hoursAfterShift;
-                 } // else: console log for skipping (role not needed)
-             });
-         }
-
-
-        // Log final state for the shift
-        if (totalRequired > 0) {
-          console.log(`    --> Unfilled Requirements for ${shiftKey}: M:${requiredRoles.manager}, D:${requiredRoles.driver}, I:${requiredRoles.insider}`);
-        } else {
-           const finalCount = newSchedule[day]?.[shiftKey]?.length || 0;
-           console.log(`    --> All minimum requirements filled for ${shiftKey}. Final count: ${finalCount}`);
-        }
+  
+          // Calculate Scarcity Score: Count unique available employees for *needed* roles
+          const availableCandidates = new Set();
+          currentEmployees.forEach(emp => {
+              // Check if employee is available for the shift and *not* already assigned anywhere today
+              const alreadyAssignedToday = Object.values(newSchedule[day]).flat().some(e => e.name === emp.name);
+              if (emp.availability?.[day]?.[shiftType] && !alreadyAssignedToday) {
+                  // Check if they can fill a *needed* role
+                  if ((remainingNeeds.manager > 0 && emp.roles.manager) ||
+                      (remainingNeeds.driver > 0 && emp.roles.driver) ||
+                      (remainingNeeds.insider > 0 && emp.roles.insider))
+                  {
+                      availableCandidates.add(emp.name);
+                  }
+              }
+          });
+          // Lower score (fewer candidates) = higher priority. Avoid division by zero.
+          const score = availableCandidates.size > 0 ? totalRemainingNeed / availableCandidates.size : 0;
+          console.log(` -> Priority Calc for ${shiftKey}: Needs M:${remainingNeeds.manager},D:${remainingNeeds.driver},I:${remainingNeeds.insider} (Total:${totalRemainingNeed}). Candidates: ${availableCandidates.size}. Score: ${score.toFixed(2)}`);
+          return { shiftType, score };
+  
+      }).sort((a, b) => {
+          if (a.score !== b.score) {
+            // Handle potential Infinity scores correctly (lowest priority)
+            if (!isFinite(a.score)) return 1;
+            if (!isFinite(b.score)) return -1;
+            // Sort by score (lower score = higher priority)
+            return a.score - b.score;
+          }
+          // Tie-breaking: Prioritize Closing > Opening > Midshift
+          const tieOrder = { 'Closing': 1, 'Opening': 2, 'Midshift': 3 };
+          return tieOrder[a.shiftType] - tieOrder[b.shiftType];
       });
-    });
-
+  
+      console.log(`    Shift Processing Order for ${day}: ${shiftPriorities.map(p => `${p.shiftType}(${isFinite(p.score) ? p.score.toFixed(2) : 'Inf'})`).join(', ')}`);
+  
+      // --- Process Shifts in Prioritized Order ---
+      shiftPriorities.forEach(({ shiftType }) => {
+          // Check if score is Infinity (meaning already filled), skip if so
+          if (!isFinite(shiftPriorities.find(p => p.shiftType === shiftType)?.score)) {
+             console.log(` -> Skipping ${day}-${shiftType} as requirements were met in Phase 1.`);
+             return;
+          }
+  
+          const shiftKey = `${day}-${shiftType}`;
+          console.log(` -> Processing Prioritized Shift: ${shiftKey}`);
+          const shiftHourDuration = shiftDurations[shiftType];
+  
+          // Recalculate remaining needs *at the time of processing* as previous shifts might affect availability
+          const baseRequirements = {
+            manager: roleRequirements[day]?.manager?.[shiftType] || 0,
+            driver: roleRequirements[day]?.driver?.[shiftType] || 0,
+            insider: roleRequirements[day]?.insider?.[shiftType] || 0
+          };
+          const currentAssignments = newSchedule[day][shiftKey];
+          const rolesAlreadyFilled = { manager: 0, driver: 0, insider: 0 };
+          currentAssignments.forEach(assignment => {
+              if (assignment.roles.manager) rolesAlreadyFilled.manager++;
+              if (assignment.roles.driver) rolesAlreadyFilled.driver++;
+              if (assignment.roles.insider) rolesAlreadyFilled.insider++;
+          });
+          const requiredRoles = { // These are the roles we still need to fill in the passes
+              manager: Math.max(0, baseRequirements.manager - rolesAlreadyFilled.manager),
+              driver: Math.max(0, baseRequirements.driver - rolesAlreadyFilled.driver),
+              insider: Math.max(0, baseRequirements.insider - rolesAlreadyFilled.insider),
+          };
+          let totalRequired = requiredRoles.manager + requiredRoles.driver + requiredRoles.insider;
+  
+          if (totalRequired <= 0) {
+              console.log(`    Requirements for ${shiftKey} already met (likely by Phase 1). Skipping passes.`);
+              return;
+          }
+           console.log(`    Needs for Passes: M:${requiredRoles.manager}, D:${requiredRoles.driver}, I:${requiredRoles.insider}`);
+  
+  
+          // Sort employees by current hours (dynamic based on assignments so far)
+          const potentialEmployees = [...currentEmployees].sort((a, b) => (currentWeekHours[a.name] || 0) - (currentWeekHours[b.name] || 0));
+  
+          // --- Assignment Pass 1: UNDER OR AT hour goal ---
+          console.log(`    Starting Pass 1 (Under/At Goal) for ${shiftKey}`);
+          let assignedInPass1 = new Set();
+           potentialEmployees.forEach(emp => {
+               if (totalRequired <= 0) return;
+  
+               const empCurrentHours = currentWeekHours[emp.name] || 0;
+               const hoursAfterShift = empCurrentHours + shiftHourDuration;
+  
+               const alreadyAssignedThisShift = newSchedule[day]?.[shiftKey]?.some(e => e.name === emp.name);
+               let alreadyAssignedTodayElsewhere = false;
+               for (const sk in newSchedule[day]) {
+                   if (sk !== shiftKey && newSchedule[day][sk]?.some(e => e.name === emp.name)) {
+                       alreadyAssignedTodayElsewhere = true;
+                       break;
+                   }
+               }
+  
+               if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere || !emp.availability?.[day]?.[shiftType]) {
+                   return; // Skip if unavailable or already working today/this shift
+               }
+  
+               if (hoursAfterShift <= emp.hourGoal) {
+                   let assignedRole = null;
+                   if (emp.roles.manager && requiredRoles.manager > 0) assignedRole = 'manager';
+                   else if (emp.roles.driver && requiredRoles.driver > 0) assignedRole = 'driver';
+                   else if (emp.roles.insider && requiredRoles.insider > 0) assignedRole = 'insider';
+  
+                   if (assignedRole) {
+                       console.log(`     ASSIGN (P1): ${emp.name} as ${assignedRole} to ${shiftKey}. Hours: ${empCurrentHours.toFixed(1)} -> ${hoursAfterShift.toFixed(1)} / ${emp.hourGoal}. Needs left: M:${requiredRoles.manager- (assignedRole==='manager'?1:0)}, D:${requiredRoles.driver - (assignedRole==='driver'?1:0)}, I:${requiredRoles.insider- (assignedRole==='insider'?1:0)}`);
+                       newSchedule[day][shiftKey].push({ name: emp.name, roles: emp.roles, isCustom: false });
+                       requiredRoles[assignedRole]--;
+                       totalRequired--;
+                       currentWeekHours[emp.name] = hoursAfterShift;
+                       assignedInPass1.add(emp.name);
+                   }
+               }
+           });
+  
+          // --- Assignment Pass 2: OVER hour goal (if needed) ---
+           if (totalRequired > 0) {
+               console.log(`    Starting Pass 2 (Over Goal) for ${shiftKey}, Needs M:${requiredRoles.manager}, D:${requiredRoles.driver}, I:${requiredRoles.insider}`);
+               potentialEmployees.forEach(emp => {
+                   if (totalRequired <= 0) return;
+                   if (assignedInPass1.has(emp.name)) return;
+  
+                   const empCurrentHours = currentWeekHours[emp.name] || 0;
+                   const hoursAfterShift = empCurrentHours + shiftHourDuration;
+  
+                   const alreadyAssignedThisShift = newSchedule[day]?.[shiftKey]?.some(e => e.name === emp.name);
+                   let alreadyAssignedTodayElsewhere = false;
+                   for (const sk in newSchedule[day]) {
+                      if (sk !== shiftKey && newSchedule[day][sk]?.some(e => e.name === emp.name)) {
+                          alreadyAssignedTodayElsewhere = true;
+                          break;
+                      }
+                   }
+  
+                   if (alreadyAssignedThisShift || alreadyAssignedTodayElsewhere || !emp.availability?.[day]?.[shiftType]) {
+                       return; // Skip
+                   }
+  
+                   let assignedRole = null;
+                   if (emp.roles.manager && requiredRoles.manager > 0) assignedRole = 'manager';
+                   else if (emp.roles.driver && requiredRoles.driver > 0) assignedRole = 'driver';
+                   else if (emp.roles.insider && requiredRoles.insider > 0) assignedRole = 'insider';
+  
+                   if (assignedRole) {
+                       console.log(`     ASSIGN (P2): ${emp.name} as ${assignedRole} to ${shiftKey}. Hours: ${empCurrentHours.toFixed(1)} -> ${hoursAfterShift.toFixed(1)} / ${emp.hourGoal}. Needs left: M:${requiredRoles.manager- (assignedRole==='manager'?1:0)}, D:${requiredRoles.driver - (assignedRole==='driver'?1:0)}, I:${requiredRoles.insider- (assignedRole==='insider'?1:0)}`);
+                       newSchedule[day][shiftKey].push({ name: emp.name, roles: emp.roles, isCustom: false });
+                       requiredRoles[assignedRole]--;
+                       totalRequired--;
+                       currentWeekHours[emp.name] = hoursAfterShift;
+                   }
+               });
+           }
+  
+          // Log final state for the shift
+          if (totalRequired > 0) {
+            console.log(`    --> Unfilled Requirements for ${shiftKey}: M:${requiredRoles.manager}, D:${requiredRoles.driver}, I:${requiredRoles.insider}`);
+          } else {
+             const finalCount = newSchedule[day]?.[shiftKey]?.length || 0;
+             console.log(`    --> All minimum requirements filled for ${shiftKey}. Final count: ${finalCount}`);
+          }
+      }); // End of prioritized shift loop
+    }); // End of days loop
+  
     console.log("--- Schedule Generation Complete ---");
     setSchedule(newSchedule);
-  };
+  }; // End of generateSchedule
 
   const formatCustomTime = (start, end) => {
     if (!start || !end) return "";
