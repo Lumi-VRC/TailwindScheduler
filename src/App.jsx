@@ -441,8 +441,25 @@ const App = () => {
            console.log(`    Needs for Passes: M:${requiredRoles.manager}, D:${requiredRoles.driver}, I:${requiredRoles.insider}`);
   
   
-          // Sort employees by current hours (dynamic based on assignments so far)
-          const potentialEmployees = [...currentEmployees].sort((a, b) => (currentWeekHours[a.name] || 0) - (currentWeekHours[b.name] || 0));
+          // Sort employees: Prioritize non-clopening, then by current hours (dynamic)
+          const potentialEmployees = [...currentEmployees].sort((a, b) => {
+            let conflictA = 0;
+            let conflictB = 0;
+
+            // Check for potential clopening conflict ONLY if the current shift is Opening
+            if (shiftType === 'Opening') {
+                conflictA = wouldCreateClopeningConflict(a.name, day, newSchedule) ? 1 : 0;
+                conflictB = wouldCreateClopeningConflict(b.name, day, newSchedule) ? 1 : 0;
+            }
+
+            // Primary sort: Penalize clopening (0 = no conflict, 1 = conflict)
+            if (conflictA !== conflictB) {
+                return conflictA - conflictB; // Sort 0s before 1s
+            }
+
+            // Secondary sort: Lower hours first
+            return (currentWeekHours[a.name] || 0) - (currentWeekHours[b.name] || 0);
+        });
   
           // --- Assignment Pass 1: UNDER OR AT hour goal ---
           console.log(`    Starting Pass 1 (Under/At Goal) for ${shiftKey}`);
@@ -540,6 +557,25 @@ const App = () => {
     console.log("--- Schedule Generation Complete ---");
     setSchedule(newSchedule);
   }; // End of generateSchedule
+
+  // Helper to get the index of a day
+  const getDayIndex = (dayName) => days.indexOf(dayName);
+
+  // Helper to get the previous day's name, handling wrap-around
+  const getPreviousDay = (dayName) => {
+    const index = getDayIndex(dayName);
+    const prevIndex = (index - 1 + days.length) % days.length;
+    return days[prevIndex];
+  };
+
+  // Helper to check if assigning an Opening shift creates a "clopen" conflict
+  const wouldCreateClopeningConflict = (employeeName, targetDay, currentSchedule) => {
+    const previousDay = getPreviousDay(targetDay);
+    const previousDayClosingShiftKey = `${previousDay}-Closing`;
+    const previousDayAssignments = currentSchedule[previousDay]?.[previousDayClosingShiftKey] || [];
+
+    return previousDayAssignments.some(assignment => assignment.name === employeeName);
+  };
 
   const formatCustomTime = (start, end) => {
     if (!start || !end) return "";
