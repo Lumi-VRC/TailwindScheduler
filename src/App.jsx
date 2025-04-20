@@ -611,6 +611,17 @@ const App = () => {
     writeFile(wb, "schedule.xlsx");
   };
 
+  // Function to get names of employees available for a specific shift type on a day
+  const getAvailableForShift = (day, shiftType) => {
+    return employees
+      .filter(emp => emp.availability?.[day]?.[shiftType]) // Check the standard availability flag
+      .map(emp => emp.name)
+      .join(", ") || "None"; // Return comma-separated names or "None"
+  };
+  // Make sure this function is *inside* the main App component,
+  // for example, before this next function:
+  // const getAvailableEmployees = (day, shiftKey, role) => { ...
+
   const isDayCovered = (day) => {
     const daySchedule = schedule[day] || {};
     const reasons = [];
